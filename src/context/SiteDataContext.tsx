@@ -1,0 +1,242 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react'
+import type { SiteData, Manager, Product } from '../types/siteData'
+import type { HomeSettings, ContactSettings } from '../types/siteData'
+import {
+  createDefaultSiteData,
+  DEFAULT_ADMIN_EMAIL,
+  DEFAULT_ADMIN_PASSWORD,
+} from '../data/defaultSiteData'
+import {
+  ADMIN_AUTH_KEY,
+  loadFromLocalStorageSync,
+  loadSiteData,
+  loginWithApi,
+  publishSiteData,
+  saveSiteDataLocal,
+  setAuthToken,
+} from '../utils/siteDataStorage'
+
+interface SiteDataContextType {
+  siteData: SiteData
+  loading: boolean
+  isAdmin: boolean
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  logout: () => void
+  updateHome: (home: Partial<HomeSettings>) => void
+  updateContact: (contact: Partial<ContactSettings>) => void
+  updateProducts: (products: Product[]) => void
+  addProduct: (product: Product) => void
+  updateProduct: (product: Product) => void
+  deleteProduct: (id: string) => void
+  updateManagers: (managers: Manager[]) => void
+  addManager: (manager: Manager) => void
+  updateManager: (manager: Manager) => void
+  deleteManager: (id: string) => void
+  updateAdminPassword: (password: string) => void
+  updateAdminEmail: (email: string) => void
+  saveDraft: () => void
+  publish: () => Promise<{ ok: boolean; message: string }>
+}
+
+const SiteDataContext = createContext<SiteDataContextType | null>(null)
+
+function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
+  return {
+    ...prev,
+    ...patch,
+    updatedAt: Date.now(),
+    home: { ...prev.home, ...patch.home },
+    contact: { ...prev.contact, ...patch.contact },
+    settings: { ...prev.settings, ...patch.settings },
+    products: patch.products ?? prev.products,
+    managers: patch.managers ?? prev.managers,
+  }
+}
+
+export function SiteDataProvider({ children }: { children: ReactNode }) {
+  const [siteData, setSiteData] = useState<SiteData>(() => {
+    return loadFromLocalStorageSync() ?? createDefaultSiteData()
+  })
+  const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(
+    () => sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    loadSiteData().then((data) => {
+      if (!cancelled) {
+        setSiteData(data)
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (loading) return
+    const timer = window.setTimeout(() => {
+      saveSiteDataLocal(siteData)
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [siteData, loading])
+
+  const login = useCallback(async (email: string, password: string) => {
+    const apiResult = await loginWithApi(email, password)
+    if (apiResult.ok) {
+      sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
+      setIsAdmin(true)
+      const fresh = await loadSiteData()
+      setSiteData(fresh)
+      return { ok: true }
+    }
+
+    // fallback بدون قاعدة بيانات (API قد يُرجع adminPassword فارغة)
+    const expectedEmail = (siteData.settings.adminEmail || DEFAULT_ADMIN_EMAIL)
+      .trim()
+      .toLowerCase()
+    const expectedPassword = siteData.settings.adminPassword || DEFAULT_ADMIN_PASSWORD
+    const inputEmail = email.trim().toLowerCase()
+
+    if (inputEmail === expectedEmail && password === expectedPassword) {
+      sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
+      setIsAdmin(true)
+      return { ok: true }
+    }
+
+    if (apiResult.useFallback) {
+      return { ok: false, error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' }
+    }
+
+    return { ok: false, error: apiResult.error ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة' }
+  }, [siteData.settings.adminEmail, siteData.settings.adminPassword])
+
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(ADMIN_AUTH_KEY)
+    setAuthToken(null)
+    setIsAdmin(false)
+  }, [])
+
+  const updateHome = useCallback((home: Partial<HomeSettings>) => {
+    setSiteData((prev) => patchData(prev, { home: { ...prev.home, ...home } }))
+  }, [])
+
+  const updateContact = useCallback((contact: Partial<ContactSettings>) => {
+    setSiteData((prev) => patchData(prev, { contact: { ...prev.contact, ...contact } }))
+  }, [])
+
+  const updateProducts = useCallback((products: Product[]) => {
+    setSiteData((prev) => patchData(prev, { products }))
+  }, [])
+
+  const addProduct = useCallback((product: Product) => {
+    setSiteData((prev) => patchData(prev, { products: [...prev.products, product] }))
+  }, [])
+
+  const updateProduct = useCallback((product: Product) => {
+    setSiteData((prev) =>
+      patchData(prev, {
+        products: prev.products.map((p) => (p.id === product.id ? product : p)),
+      })
+    )
+  }, [])
+
+  const deleteProduct = useCallback((id: string) => {
+    setSiteData((prev) =>
+      patchData(prev, { products: prev.products.filter((p) => p.id !== id) })
+    )
+  }, [])
+
+  const updateManagers = useCallback((managers: Manager[]) => {
+    setSiteData((prev) => patchData(prev, { managers }))
+  }, [])
+
+  const addManager = useCallback((manager: Manager) => {
+    setSiteData((prev) => patchData(prev, { managers: [...prev.managers, manager] }))
+  }, [])
+
+  const updateManager = useCallback((manager: Manager) => {
+    setSiteData((prev) =>
+      patchData(prev, {
+        managers: prev.managers.map((m) => (m.id === manager.id ? manager : m)),
+      })
+    )
+  }, [])
+
+  const deleteManager = useCallback((id: string) => {
+    setSiteData((prev) =>
+      patchData(prev, { managers: prev.managers.filter((m) => m.id !== id) })
+    )
+  }, [])
+
+  const updateAdminPassword = useCallback((password: string) => {
+    setSiteData((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, adminPassword: password },
+    }))
+  }, [])
+
+  const updateAdminEmail = useCallback((email: string) => {
+    setSiteData((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, adminEmail: email.trim().toLowerCase() },
+    }))
+  }, [])
+
+  const saveDraft = useCallback(() => {
+    saveSiteDataLocal(siteData)
+  }, [siteData])
+
+  const publish = useCallback(async () => {
+    const result = await publishSiteData(siteData)
+    if (result.ok) {
+      setSiteData(result.data ?? { ...siteData, updatedAt: Date.now() })
+    }
+    return result
+  }, [siteData])
+
+  return (
+    <SiteDataContext.Provider
+      value={{
+        siteData,
+        loading,
+        isAdmin,
+        login,
+        logout,
+        updateHome,
+        updateContact,
+        updateProducts,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        updateManagers,
+        addManager,
+        updateManager,
+        deleteManager,
+        updateAdminPassword,
+        updateAdminEmail,
+        saveDraft,
+        publish,
+      }}
+    >
+      {children}
+    </SiteDataContext.Provider>
+  )
+}
+
+export function useSiteData() {
+  const ctx = useContext(SiteDataContext)
+  if (!ctx) throw new Error('useSiteData must be used within SiteDataProvider')
+  return ctx
+}

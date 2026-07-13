@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model SiteConfig {
+  id             Int      @id @default(1)
+  version        Int      @default(1)
+  heroTitleAr      String
+  heroTitleEn      String
+  heroSubtitleAr   String
+  heroSubtitleEn   String
+  heroDescAr       String
+  heroDescEn       String
+  slideImages      String[]
+  whatsapp         String
+  facebook         String
+  mapsUrl          String
+  addressAr        String
+  addressEn        String
+  whatsappMsgAr    String
+  whatsappMsgEn    String
+  floatLinks       Json     @default("[]")
+  aiEnabled        Boolean  @default(true)
+  aiWelcomeAr      String   @default("مرحباً! أنا مساعد ضرغام CNC. اسألني عن أعمالنا وخدماتنا.")
+  aiWelcomeEn      String   @default("Hello! I am Dorgham CNC assistant. Ask about our works and services.")
+  adminEmail       String
+  adminPasswordHash String
+  updatedAt        DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  nameAr       String   @default("")
+  nameEn       String   @default("")
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Product {
+  id            String   @id
+  titleAr       String
+  titleEn       String
+  descriptionAr String
+  descriptionEn String
+  category      String
+  image         String
+  materialsAr   String
+  materialsEn   String
+  dimensionsAr  String
+  dimensionsEn  String
+  featured      Boolean  @default(false)
+  colors        String[]
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Manager {
+  id        String  @id @default(uuid())
+  nameAr    String
+  nameEn    String
+  roleAr    String
+  roleEn    String
+  phone     String
+  whatsapp  String?
+  sortOrder Int     @default(0)
+}

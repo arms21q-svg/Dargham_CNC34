@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
 import { AppProvider } from './context/AppContext'
 import { SiteDataProvider } from './context/SiteDataContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
+import BrandSplash from './components/BrandSplash'
 
 const HomePage = lazy(() => import('./pages/HomePage'))
 const WorksPage = lazy(() => import('./pages/WorksPage'))
@@ -76,46 +77,58 @@ function AdminSuspense({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>
 }
 
+function AppShell() {
+  const { pathname } = useLocation()
+  const isAdmin = pathname.startsWith('/admin')
+
+  return (
+    <>
+      <BrandSplash skip={isAdmin} />
+      <Routes>
+        <Route
+          path="/admin/login"
+          element={
+            <AdminSuspense>
+              <AdminLogin />
+            </AdminSuspense>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminSuspense>
+              <AdminLayout />
+            </AdminSuspense>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="home" element={<AdminHome />} />
+          <Route path="works" element={<AdminWorks />} />
+          <Route path="contact" element={<AdminContact />} />
+          <Route path="managers" element={<AdminManagers />} />
+        </Route>
+
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/works" element={<WorksPage />} />
+          <Route path="/works/all" element={<AllWorksPage />} />
+          <Route path="/works/:id" element={<ProductDetailPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/saved" element={<SavedPage />} />
+        </Route>
+      </Routes>
+    </>
+  )
+}
+
 export default function App() {
   return (
     <SiteDataProvider>
       <AppProvider>
         <BrowserRouter>
-          <Routes>
-            <Route
-              path="/admin/login"
-              element={
-                <AdminSuspense>
-                  <AdminLogin />
-                </AdminSuspense>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <AdminSuspense>
-                  <AdminLayout />
-                </AdminSuspense>
-              }
-            >
-              <Route index element={<AdminDashboard />} />
-              <Route path="home" element={<AdminHome />} />
-              <Route path="works" element={<AdminWorks />} />
-              <Route path="contact" element={<AdminContact />} />
-              <Route path="managers" element={<AdminManagers />} />
-            </Route>
-
-            <Route element={<PublicLayout />}>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/works" element={<WorksPage />} />
-              <Route path="/works/all" element={<AllWorksPage />} />
-              <Route path="/works/:id" element={<ProductDetailPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/faq" element={<FAQPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/saved" element={<SavedPage />} />
-            </Route>
-          </Routes>
+          <AppShell />
         </BrowserRouter>
       </AppProvider>
     </SiteDataProvider>

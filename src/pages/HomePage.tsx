@@ -1,50 +1,9 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import HeroSlider from '../components/HeroSlider'
 import ProductCard from '../components/ProductCard'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
-
-const HomeAiAnalyze = lazy(() => import('../components/HomeAiAnalyze'))
-
-function LazyAiSection() {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const [show, setShow] = useState(false)
-
-  useEffect(() => {
-    const el = hostRef.current
-    if (!el) return
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setShow(true)
-          io.disconnect()
-        }
-      },
-      { rootMargin: '200px' }
-    )
-
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
-
-  return (
-    <div id="ai-analyze" ref={hostRef} className="min-h-[12rem]">
-      {show ? (
-        <Suspense
-          fallback={
-            <div className="section-padding flex justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600" />
-            </div>
-          }
-        >
-          <HomeAiAnalyze />
-        </Suspense>
-      ) : null}
-    </div>
-  )
-}
 
 export default function HomePage() {
   const { lang, t } = useApp()
@@ -71,10 +30,6 @@ export default function HomePage() {
               dir={lang === 'ar' ? 'rtl' : 'ltr'}
               style={{ textAlign: lang === 'ar' ? 'right' : 'left' }}
             >
-              <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm">
-                {lang === 'ar' ? 'نحت خشب · تقنية CNC' : 'Wood CNC · Crafted with care'}
-              </p>
-
               <h1 className="mb-3 text-4xl font-extrabold leading-tight text-gray-900 dark:text-white sm:text-5xl lg:text-[3.25rem]">
                 {home.heroTitle[lang]}
               </h1>
@@ -94,12 +49,6 @@ export default function HomePage() {
                 <Link to="/contact" className="btn-secondary min-w-[140px]">
                   {t.home.contactUs}
                 </Link>
-                <a
-                  href="#ai-analyze"
-                  className="text-sm font-semibold text-violet-700 underline-offset-4 hover:underline dark:text-violet-300"
-                >
-                  {lang === 'ar' ? 'تحليل صورة بالـ AI' : 'AI image analysis'}
-                </a>
               </div>
 
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -122,8 +71,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <LazyAiSection />
 
       <section className="section-padding">
         <div className="container-main">
@@ -154,7 +101,7 @@ export default function HomePage() {
               </h2>
               <p className="mt-2 text-base text-gray-600 dark:text-gray-400">{t.works.subtitle}</p>
             </div>
-            <Link to="/works/all" className="btn-secondary">
+            <Link to="/works" className="btn-secondary">
               {t.home.viewAll} →
             </Link>
           </div>

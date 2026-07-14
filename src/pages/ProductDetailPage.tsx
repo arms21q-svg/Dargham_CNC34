@@ -29,7 +29,7 @@ export default function ProductDetailPage() {
   return (
     <div className="section-padding">
       <div className="container-main">
-        <Link to="/works/all" className="btn-ghost mb-6 inline-flex">
+        <Link to="/works" className="btn-ghost mb-6 inline-flex">
           ← {t.common.back}
         </Link>
 

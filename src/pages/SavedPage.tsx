@@ -25,7 +25,7 @@ export default function SavedPage() {
               </svg>
             </div>
             <p className="mb-4 text-gray-500 dark:text-gray-400">{t.works.noResults}</p>
-            <Link to="/works/all" className="btn-primary">
+            <Link to="/works" className="btn-primary">
               {t.works.allWorks}
             </Link>
           </div>

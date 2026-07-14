@@ -340,7 +340,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
           WhatsApp
         </a>
         <Link
-          to="/works/all"
+          to="/works"
           onClick={onClose}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-primary-600 px-3 py-2 text-xs font-bold text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-950"
         >

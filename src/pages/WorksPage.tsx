@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import ProductCard from '../components/ProductCard'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
@@ -6,7 +5,8 @@ import { useSiteData } from '../context/SiteDataContext'
 export default function WorksPage() {
   const { t } = useApp()
   const { siteData } = useSiteData()
-  const featured = siteData.products.filter((p) => p.featured)
+  const products = siteData.products
+
   return (
     <div className="section-padding">
       <div className="container-main">
@@ -20,20 +20,21 @@ export default function WorksPage() {
           <div className="mx-auto mt-4 h-1 w-16 rounded-full bg-primary-500" />
         </div>
 
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            {t.works.featured}
+            {t.works.allWorks}
           </h2>
-          <Link to="/works/all" className="btn-primary">
-            {t.works.allWorks} →
-          </Link>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {products.length === 0 ? (
+          <p className="py-16 text-center text-gray-500 dark:text-gray-400">{t.works.noResults}</p>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

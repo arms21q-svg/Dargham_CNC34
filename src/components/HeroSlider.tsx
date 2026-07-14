@@ -46,14 +46,6 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
     if (next) preloadImage(next, { width: 900, quality: 72 })
   }, [current, slideImages])
 
-  const goPrev = () => {
-    setCurrent((prev) => (prev - 1 + slideImages.length) % slideImages.length)
-  }
-
-  const goNext = () => {
-    setCurrent((prev) => (prev + 1) % slideImages.length)
-  }
-
   if (slideImages.length === 0) {
     return (
       <div
@@ -104,31 +96,6 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
           </div>
         )
       })}
-
-      {side && (
-        <>
-          <button
-            type="button"
-            onClick={goPrev}
-            className="absolute start-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md backdrop-blur-sm transition hover:bg-white"
-            aria-label="السابق"
-          >
-            <svg className="h-5 w-5 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            className="absolute end-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md backdrop-blur-sm transition hover:bg-white"
-            aria-label="التالي"
-          >
-            <svg className="h-5 w-5 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </>
-      )}
 
       <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-full bg-black/25 px-2.5 py-1.5 backdrop-blur-sm">
         {slideImages.map((_, i) => (

@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { prisma } from '../db.js'
-import { generateRandomPassword } from '../utils/adminUsers.js'
+import { prisma } from '../db'
+import { generateRandomPassword } from '../utils/adminUsers'
 
 const router = Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'

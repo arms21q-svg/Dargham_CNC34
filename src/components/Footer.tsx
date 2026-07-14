@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+'use client'
+
+import Link from 'next/link'
 import { useApp } from '../context/AppContext'
 import SocialLinks from './SocialLinks'
 
@@ -27,16 +29,16 @@ export default function Footer() {
               {lang === 'ar' ? 'روابط سريعة' : 'Quick Links'}
             </h3>
             <div className="flex flex-col gap-2">
-              <Link to="/works" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+              <Link href="/works" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
                 {t.nav.works}
               </Link>
-              <Link to="/about" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+              <Link href="/about" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
                 {t.nav.about}
               </Link>
-              <Link to="/faq" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+              <Link href="/faq" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
                 {t.nav.faq}
               </Link>
-              <Link to="/contact" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+              <Link href="/contact" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
                 {t.nav.contact}
               </Link>
             </div>

@@ -10,7 +10,7 @@ import {
   localImageAnalysis,
   parseImagePayload,
   type ChatMessage,
-} from '../aiCore.js'
+} from '../aiCore'
 
 const router = Router()
 

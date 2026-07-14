@@ -1,3 +1,5 @@
+'use client'
+
 import {
   createContext,
   useCallback,
@@ -63,21 +65,22 @@ function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
 }
 
 export function SiteDataProvider({ children }: { children: ReactNode }) {
-  const [siteData, setSiteData] = useState<SiteData>(() => {
-    return loadFromLocalStorageSync() ?? createDefaultSiteData()
-  })
+  const [siteData, setSiteData] = useState<SiteData>(() => createDefaultSiteData())
   const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(() => {
-    const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
-    // Old local-only sessions cannot publish on Vercel — force re-login
-    if (flagged && isVercelHost() && !getAuthToken()) {
-      sessionStorage.removeItem(ADMIN_AUTH_KEY)
-      return false
-    }
-    return flagged
-  })
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
+    const local = loadFromLocalStorageSync()
+    if (local) setSiteData(local)
+
+    const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
+    if (flagged && isVercelHost() && !getAuthToken()) {
+      sessionStorage.removeItem(ADMIN_AUTH_KEY)
+      setIsAdmin(false)
+    } else {
+      setIsAdmin(flagged)
+    }
+
     let cancelled = false
 
     loadSiteData().then((data) => {

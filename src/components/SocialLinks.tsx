@@ -1,3 +1,5 @@
+'use client'
+
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 import { getWhatsAppUrl } from '../utils/siteDataStorage'

@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 
 const SPLASH_MS = 3000
@@ -12,12 +14,15 @@ interface BrandSplashProps {
  * Elegant brand intro — once per browser tab session when opening the site.
  */
 export default function BrandSplash({ skip = false }: BrandSplashProps) {
-  const [visible, setVisible] = useState(() => {
-    if (skip || typeof window === 'undefined') return false
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
-    return sessionStorage.getItem(SESSION_KEY) !== '1'
-  })
+  const [visible, setVisible] = useState(false)
   const [leaving, setLeaving] = useState(false)
+
+  useEffect(() => {
+    if (skip) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (sessionStorage.getItem(SESSION_KEY) === '1') return
+    setVisible(true)
+  }, [skip])
 
   useEffect(() => {
     if (!visible) return

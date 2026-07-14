@@ -1,24 +1,14 @@
-import { memo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
+'use client'
 
-function prefetchRoute(to: string) {
-  const map: Record<string, () => Promise<unknown>> = {
-    '/': () => import('../pages/HomePage'),
-    '/works': () => import('../pages/WorksPage'),
-    '/works/all': () => import('../pages/AllWorksPage'),
-    '/about': () => import('../pages/AboutPage'),
-    '/faq': () => import('../pages/FAQPage'),
-    '/contact': () => import('../pages/ContactPage'),
-    '/saved': () => import('../pages/SavedPage'),
-  }
-  map[to]?.()
-}
+import { memo, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useApp } from '../context/AppContext'
 
 function Header() {
   const { lang, setLang, t, isDark, toggleTheme } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
-  const location = useLocation()
+  const pathname = usePathname()
 
   const links = [
     { to: '/', label: t.nav.home },
@@ -29,12 +19,12 @@ function Header() {
     { to: '/saved', label: t.nav.saved },
   ]
 
-  const isActive = (path: string) => location.pathname === path
+  const isActive = (path: string) => pathname === path
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-md dark:border-gray-800 dark:bg-surface-dark/90">
       <div className="container-main flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2" onMouseEnter={() => prefetchRoute('/')}>
+        <Link href="/" className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-lg font-bold text-white">
             D
           </div>
@@ -47,9 +37,7 @@ function Header() {
           {links.map((link) => (
             <Link
               key={link.to}
-              to={link.to}
-              onMouseEnter={() => prefetchRoute(link.to)}
-              onFocus={() => prefetchRoute(link.to)}
+              href={link.to}
               className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 isActive(link.to)
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
@@ -115,9 +103,8 @@ function Header() {
             {links.map((link) => (
               <Link
                 key={link.to}
-                to={link.to}
+                href={link.to}
                 onClick={() => setMenuOpen(false)}
-                onMouseEnter={() => prefetchRoute(link.to)}
                 className={`rounded-lg px-4 py-3 font-medium transition-colors ${
                   isActive(link.to)
                     ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'

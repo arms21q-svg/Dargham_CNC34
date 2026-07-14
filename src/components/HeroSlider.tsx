@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 import { useSiteData } from '../context/SiteDataContext'
 import OptimizedImage from './OptimizedImage'

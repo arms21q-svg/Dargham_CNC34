@@ -26,10 +26,12 @@ export function hasPublishSession(): boolean {
 }
 
 export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
   return sessionStorage.getItem(AUTH_TOKEN_KEY)
 }
 
 export function setAuthToken(token: string | null) {
+  if (typeof window === 'undefined') return
   if (token) sessionStorage.setItem(AUTH_TOKEN_KEY, token)
   else sessionStorage.removeItem(AUTH_TOKEN_KEY)
 }
@@ -109,6 +111,7 @@ async function loadFromJson(defaults: SiteData): Promise<SiteData | null> {
 }
 
 export function loadFromLocalStorageSync(defaults?: SiteData): SiteData | null {
+  if (typeof window === 'undefined') return null
   const base = defaults ?? createDefaultSiteData()
   try {
     const stored = localStorage.getItem(SITE_DATA_KEY)

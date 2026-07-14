@@ -1,3 +1,5 @@
+'use client'
+
 import { useRef, useState } from 'react'
 import ImagePicker from './ImagePicker'
 import { fileToDataUrl } from '../../utils/imageFile'

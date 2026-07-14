@@ -1,5 +1,7 @@
+'use client'
+
 import { memo } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import type { Product } from '../data/content'
 import { useApp } from '../context/AppContext'
 import OptimizedImage from './OptimizedImage'
@@ -15,7 +17,7 @@ function ProductCard({ product, showSave = true }: ProductCardProps) {
 
   return (
     <div className="card-hover group overflow-hidden content-visibility-auto">
-      <Link to={`/works/${product.id}`} className="block">
+      <Link href={`/works/${product.id}`} className="block">
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
           <OptimizedImage
             src={product.image}
@@ -29,7 +31,7 @@ function ProductCard({ product, showSave = true }: ProductCardProps) {
       </Link>
 
       <div className="p-4">
-        <Link to={`/works/${product.id}`}>
+        <Link href={`/works/${product.id}`}>
           <h3 className="mb-1 font-semibold text-gray-800 transition-colors group-hover:text-primary-600 dark:text-gray-100">
             {product.title[lang]}
           </h3>
@@ -70,7 +72,7 @@ function ProductCard({ product, showSave = true }: ProductCardProps) {
             </button>
           )}
           <Link
-            to={`/works/${product.id}`}
+            href={`/works/${product.id}`}
             className="rounded-lg bg-primary-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-700"
           >
             {t.works.viewDetails}

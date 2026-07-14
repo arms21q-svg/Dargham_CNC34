@@ -1,13 +1,4 @@
 {
-  "buildCommand": "prisma generate && npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "rewrites": [
-    { "source": "/api/ai/chat", "destination": "/api/ai-chat" },
-    { "source": "/api/ai/analyze-image", "destination": "/api/ai-analyze-image" },
-    { "source": "/api/ai/search-by-image", "destination": "/api/ai-search-by-image" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
   "headers": [
     {
       "source": "/site-data.json",
@@ -17,43 +8,6 @@
           "value": "public, max-age=60, stale-while-revalidate=300"
         }
       ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)\\.(js|css|woff2|svg|png|jpg|jpeg|webp|avif)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/index.html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
-      ]
     }
-  ],
-  "functions": {
-    "api/health.ts": { "maxDuration": 30 },
-    "api/site-data.ts": { "maxDuration": 30 },
-    "api/auth/login.ts": { "maxDuration": 30 },
-    "api/admin-users.ts": { "maxDuration": 30 },
-    "api/save-data.ts": { "maxDuration": 10 },
-    "api/ai-chat.ts": { "maxDuration": 60 },
-    "api/ai-analyze-image.ts": { "maxDuration": 60 },
-    "api/ai-search-by-image.ts": { "maxDuration": 60 }
-  }
+  ]
 }

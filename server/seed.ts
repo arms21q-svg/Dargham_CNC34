@@ -1,13 +1,13 @@
 import './loadEnv.js'
 import bcrypt from 'bcryptjs'
-import { prisma } from './db.js'
+import { prisma } from './db'
 import { createDefaultSiteData } from '../src/data/defaultSiteData'
 import {
   configFromSiteData,
   managerFromSiteData,
   productFromSiteData,
-} from './mappers.js'
-import { ensureSuperAdminSeeded } from './utils/adminUsers.js'
+} from './mappers'
+import { ensureSuperAdminSeeded } from './utils/adminUsers'
 
 async function main() {
   const defaults = createDefaultSiteData()

@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
-import { prisma } from '../db.js'
-import { requireAuth, requireSuperAdmin, type AuthRequest } from '../middleware/auth.js'
-import { generateRandomPassword } from '../utils/adminUsers.js'
+import { prisma } from '../db'
+import { requireAuth, requireSuperAdmin, type AuthRequest } from '../middleware/auth'
+import { generateRandomPassword } from '../utils/adminUsers'
 
 const router = Router()
 

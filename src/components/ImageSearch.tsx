@@ -1,3 +1,5 @@
+'use client'
+
 import { useRef, useState, type DragEvent } from 'react'
 import { useApp } from '../context/AppContext'
 import { extractColorsFromFile } from '../utils/imageSearch'

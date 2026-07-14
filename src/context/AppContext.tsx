@@ -1,3 +1,5 @@
+'use client'
+
 import {
   createContext,
   useCallback,
@@ -27,26 +29,40 @@ const SAVED_KEY = 'dorgham-cnc-saved'
 const THEME_KEY = 'dorgham-cnc-theme'
 const LANG_KEY = 'dorgham-cnc-lang'
 
+function readLang(): Lang {
+  if (typeof window === 'undefined') return 'ar'
+  return localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'ar'
+}
+
+function readDark(): boolean {
+  if (typeof window === 'undefined') return false
+  const stored = localStorage.getItem(THEME_KEY)
+  if (stored) return stored === 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+function readSavedIds(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const stored = localStorage.getItem(SAVED_KEY)
+    return stored ? (JSON.parse(stored) as string[]) : []
+  } catch {
+    return []
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    const stored = localStorage.getItem(LANG_KEY)
-    return stored === 'en' ? 'en' : 'ar'
-  })
+  const [lang, setLangState] = useState<Lang>('ar')
+  const [isDark, setIsDark] = useState(false)
+  const [savedIds, setSavedIds] = useState<string[]>([])
+  const [hydrated, setHydrated] = useState(false)
 
-  const [isDark, setIsDark] = useState(() => {
-    const stored = localStorage.getItem(THEME_KEY)
-    if (stored) return stored === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-
-  const [savedIds, setSavedIds] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(SAVED_KEY)
-      return stored ? (JSON.parse(stored) as string[]) : []
-    } catch {
-      return []
-    }
-  })
+  useEffect(() => {
+    setLangState(readLang())
+    setIsDark(readDark())
+    setSavedIds(readSavedIds())
+    setHydrated(true)
+  }, [])
 
   const setLang = useCallback((newLang: Lang) => {
     setLangState(newLang)
@@ -74,11 +90,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isSaved = useCallback((id: string) => savedIds.includes(id), [savedIds])
 
   useEffect(() => {
+    if (!hydrated) return
     document.documentElement.lang = lang
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     document.documentElement.classList.toggle('dark', isDark)
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light'
-  }, [lang, isDark])
+  }, [lang, isDark, hydrated])
 
   const value = useMemo(
     () => ({

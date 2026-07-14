@@ -1,15 +1,15 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
-import { prisma } from '../db.js'
+import { prisma } from '../db'
 import {
   configFromSiteData,
   managerFromSiteData,
   productFromSiteData,
   toSiteData,
-} from '../mappers.js'
+} from '../mappers'
 import type { SiteData } from '../../src/types/siteData'
-import { requireAuth, type AuthRequest } from '../middleware/auth.js'
-import { syncSuperAdminFromConfig } from '../utils/adminUsers.js'
+import { requireAuth, type AuthRequest } from '../middleware/auth'
+import { syncSuperAdminFromConfig } from '../utils/adminUsers'
 const router = Router()
 
 async function fetchSiteData() {

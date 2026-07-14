@@ -1,3 +1,5 @@
+'use client'
+
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'

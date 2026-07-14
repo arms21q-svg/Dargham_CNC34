@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+prisma/.env
+prisma/.env.*
+*.local
+node_modules
+dist
+.vercel

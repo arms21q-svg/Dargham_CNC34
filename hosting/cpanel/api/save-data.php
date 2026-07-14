@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['ok' => false, 'error' => 'Method not allowed — use POST']);
     exit;
 }
 
@@ -20,25 +20,22 @@ $data = json_decode($input, true);
 
 if (!$data) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid JSON']);
+    echo json_encode(['ok' => false, 'error' => 'Invalid JSON']);
     exit;
 }
 
 $file = dirname(__DIR__) . '/site-data.json';
 $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-$result = file_put_contents($file, $json);
-
-// نسخة احتياطية في dist عند الاستضافة
-$distFile = dirname(__DIR__, 2) . '/site-data.json';
-if (is_writable(dirname($distFile))) {
-    @file_put_contents($distFile, $json);
-}
+$result = @file_put_contents($file, $json);
 
 if ($result === false) {
     http_response_code(500);
-    echo json_encode(['error' => 'Failed to save']);
+    echo json_encode([
+        'ok' => false,
+        'error' => 'Failed to save — check write permissions on site-data.json',
+    ]);
     exit;
 }
 
-echo json_encode(['ok' => true, 'message' => 'Saved successfully']);
+echo json_encode(['ok' => true, 'message' => 'تم النشر على الموقع بنجاح']);

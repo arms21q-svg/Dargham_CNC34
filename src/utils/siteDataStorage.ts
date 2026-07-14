@@ -9,8 +9,16 @@ export const SITE_DATA_KEY = 'dorgham-cnc-site-data'
 export const ADMIN_AUTH_KEY = 'dorgham-cnc-admin-auth'
 export const AUTH_TOKEN_KEY = 'dorgham-cnc-auth-token'
 
-const LEGACY_SAVE_ENDPOINTS = [apiUrl('/api/save-data'), apiUrl('/api/save-data.php')]
-const FETCH_TIMEOUT_MS = 3200
+/** Static hosting (cPanel only) — Vercel does not run PHP. */
+const STATIC_SAVE_ENDPOINT = apiUrl('/api/save-data.php')
+/** Cold start on Vercel serverless can exceed 3s. */
+const FETCH_TIMEOUT_MS = 15000
+
+function isVercelHost(): boolean {
+  if (typeof window === 'undefined') return false
+  const h = window.location.hostname
+  return h.includes('vercel.app') || h.includes('dhirghamcnc.com')
+}
 
 export function getAuthToken(): string | null {
   return sessionStorage.getItem(AUTH_TOKEN_KEY)
@@ -214,22 +222,49 @@ export async function loginWithApi(
   }
 }
 
-async function saveToLegacyEndpoints(payload: SiteData): Promise<{ ok: boolean; message: string } | null> {
-  for (const endpoint of LEGACY_SAVE_ENDPOINTS) {
+async function saveToStaticHosting(payload: SiteData): Promise<{
+  ok: boolean
+  message: string
+  serverError?: boolean
+} | null> {
+  try {
+    const res = await fetchWithTimeout(STATIC_SAVE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res) return null
+
+    let json: { ok?: boolean; message?: string; error?: string } = {}
     try {
-      const res = await fetchWithTimeout(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res?.ok) continue
-      const json = (await res.json()) as { ok?: boolean; message?: string }
-      if (json.ok) {
-        return { ok: true, message: json.message ?? 'تم الحفظ والنشر بنجاح' }
-      }
+      json = (await res.json()) as typeof json
     } catch {
-      // try next
+      if (res.status === 405 || res.status === 404) {
+        return {
+          ok: false,
+          serverError: true,
+          message:
+            'السيرفر لا يقبل الحفظ — تأكد من رفع مجلد api وملف save-data.php مع صلاحيات كتابة لـ site-data.json',
+        }
+      }
+      return null
     }
+
+    if (res.ok && json.ok) {
+      return { ok: true, message: json.message ?? 'تم النشر على الموقع بنجاح' }
+    }
+
+    if (res.status === 405 || res.status === 404) {
+      return {
+        ok: false,
+        serverError: true,
+        message:
+          json.error ??
+          'تعذر النشر — ارفع مجلد api من dist وتأكد أن PHP مفعّل على الاستضافة',
+      }
+    }
+  } catch {
+    return null
   }
   return null
 }
@@ -286,16 +321,29 @@ export async function publishSiteData(
     }
   }
 
-  const legacy = await saveToLegacyEndpoints(payload)
-  if (legacy) {
-    return { ...legacy, data: payload }
+  // PHP only works on cPanel/Apache — skip dead 405 calls on Vercel
+  if (!isVercelHost()) {
+    const staticSave = await saveToStaticHosting(payload)
+    if (staticSave?.ok) {
+      return { ...staticSave, data: payload }
+    }
+    if (staticSave?.serverError) {
+      return { ok: false, message: staticSave.message }
+    }
+
+    downloadSiteData(payload)
+    return {
+      ok: true,
+      message:
+        'تم الحفظ محلياً فقط — لم يُرفع على السيرفر. حمّل site-data.json أو فعّل PHP',
+      data: payload,
+    }
   }
 
-  downloadSiteData(payload)
   return {
-    ok: true,
-    message: 'تم الحفظ محلياً — التغييرات تظهر فوراً في هذا المتصفح',
-    data: payload,
+    ok: false,
+    message:
+      'تعذر النشر على السيرفر — سجّل الخروج ثم الدخول مجدداً (يلزم جلسة API) ثم اضغط نشر',
   }
 }
 

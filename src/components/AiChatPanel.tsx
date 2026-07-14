@@ -119,7 +119,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
     }
 
     try {
-      const res = await fetch(apiUrl('/api/ai/chat'), {
+      const res = await fetch(apiUrl('/api/ai-chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

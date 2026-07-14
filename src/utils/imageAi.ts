@@ -51,7 +51,7 @@ export async function searchProductsByImage(
   lang: 'ar' | 'en'
 ): Promise<{ productIds: string[]; analysis?: string; mode: string } | null> {
   const { base64, mimeType } = await prepareImageFile(file)
-  const res = await fetch(apiUrl('/api/ai/search-by-image'), {
+  const res = await fetch(apiUrl('/api/ai-search-by-image'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ imageBase64: base64, mimeType, lang }),
@@ -81,7 +81,7 @@ export async function analyzeImageWithAi(
   message?: string
 ): Promise<{ reply: string; mode: string } | null> {
   const { base64, mimeType } = await prepareImageFile(file)
-  const res = await fetch(apiUrl('/api/ai/analyze-image'), {
+  const res = await fetch(apiUrl('/api/ai-analyze-image'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ imageBase64: base64, mimeType, lang, message }),

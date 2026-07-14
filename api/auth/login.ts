@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import '../server/loadEnv.js'
-import { prisma } from '../server/db.js'
+import '../../server/loadEnv.js'
+import { prisma } from '../../server/db.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
 

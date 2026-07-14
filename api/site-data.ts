@@ -24,7 +24,7 @@ async function fetchSiteData() {
 async function verifyBearer(req: VercelRequest): Promise<boolean> {
   const header = req.headers.authorization
   if (!header?.startsWith('Bearer ')) return false
-  const { default: jwt } = await import('jsonwebtoken')
+  const jwt = (await import('jsonwebtoken')).default
   try {
     jwt.verify(header.slice(7), JWT_SECRET)
     return true
@@ -86,7 +86,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       })
 
-      // Sync super admin without pulling node:crypto at cold start of GET
       try {
         const { syncSuperAdminFromConfig } = await import('../server/utils/adminUsers.js')
         await syncSuperAdminFromConfig(

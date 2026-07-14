@@ -30,28 +30,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (adminUser) {
       const validPassword = await bcrypt.compare(password, adminUser.passwordHash)
-      if (!validPassword) {
-        res.status(401).json({ ok: false, error: 'بيانات الدخول غير صحيحة' })
+      if (validPassword) {
+        const token = jwt.sign(
+          { email: adminUser.email, role: adminUser.role, userId: adminUser.id },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        )
+
+        res.status(200).json({
+          ok: true,
+          token,
+          user: {
+            email: adminUser.email,
+            role: adminUser.role,
+            nameAr: adminUser.nameAr,
+            nameEn: adminUser.nameEn,
+          },
+        })
         return
       }
-
-      const token = jwt.sign(
-        { email: adminUser.email, role: adminUser.role, userId: adminUser.id },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      )
-
-      res.status(200).json({
-        ok: true,
-        token,
-        user: {
-          email: adminUser.email,
-          role: adminUser.role,
-          nameAr: adminUser.nameAr,
-          nameEn: adminUser.nameEn,
-        },
-      })
-      return
+      // Wrong AdminUser password → still try legacy siteConfig credentials
     }
 
     const config = await prisma.siteConfig.findUnique({ where: { id: 1 } })

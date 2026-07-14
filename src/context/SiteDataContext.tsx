@@ -15,6 +15,8 @@ import {
 } from '../data/defaultSiteData'
 import {
   ADMIN_AUTH_KEY,
+  getAuthToken,
+  isVercelHost,
   loadFromLocalStorageSync,
   loadSiteData,
   loginWithApi,
@@ -65,9 +67,15 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
     return loadFromLocalStorageSync() ?? createDefaultSiteData()
   })
   const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(
-    () => sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
-  )
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
+    // Old local-only sessions cannot publish on Vercel — force re-login
+    if (flagged && isVercelHost() && !getAuthToken()) {
+      sessionStorage.removeItem(ADMIN_AUTH_KEY)
+      return false
+    }
+    return flagged
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -102,7 +110,17 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       return { ok: true }
     }
 
-    // fallback بدون قاعدة بيانات (API قد يُرجع adminPassword فارغة)
+    // On Vercel publishing requires an API JWT — never accept local-only login
+    if (isVercelHost()) {
+      return {
+        ok: false,
+        error:
+          apiResult.error ??
+          'تعذر تسجيل الدخول عبر السيرفر. تحقق من الإنترنت وحاول مجدداً',
+      }
+    }
+
+    // fallback بدون قاعدة بيانات (تطوير / cPanel فقط)
     const expectedEmail = (siteData.settings.adminEmail || DEFAULT_ADMIN_EMAIL)
       .trim()
       .toLowerCase()

@@ -12,12 +12,17 @@ export const AUTH_TOKEN_KEY = 'dorgham-cnc-auth-token'
 /** Static hosting (cPanel only) — Vercel does not run PHP. */
 const STATIC_SAVE_ENDPOINT = apiUrl('/api/save-data.php')
 /** Cold start on Vercel serverless can exceed 3s. */
-const FETCH_TIMEOUT_MS = 15000
+const FETCH_TIMEOUT_MS = 30000
 
-function isVercelHost(): boolean {
+export function isVercelHost(): boolean {
   if (typeof window === 'undefined') return false
   const h = window.location.hostname
   return h.includes('vercel.app') || h.includes('dhirghamcnc.com')
+}
+
+/** Admin UI session without API JWT cannot publish on Vercel. */
+export function hasPublishSession(): boolean {
+  return Boolean(getAuthToken())
 }
 
 export function getAuthToken(): string | null {
@@ -275,9 +280,18 @@ export async function publishSiteData(
   const payload: SiteData = { ...data, updatedAt: Date.now() }
   const token = getAuthToken()
 
-  if (token) {
+  if (!token) {
+    if (isVercelHost()) {
+      return {
+        ok: false,
+        message:
+          'لا توجد جلسة نشر — سجّل الخروج ثم الدخول مجدداً ثم اضغط «نشر على الموقع»',
+      }
+    }
+  } else {
     try {
-      const res = await fetchWithTimeout(apiUrl('/api/site-data'), {        method: 'PUT',
+      const res = await fetchWithTimeout(apiUrl('/api/site-data'), {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -285,31 +299,49 @@ export async function publishSiteData(
         body: JSON.stringify(payload),
       })
 
-      if (res) {
-        const json = (await res.json()) as {
-          ok: boolean
-          message?: string
-          error?: string
-          data?: SiteData
-        }
-
-        if (res.ok && json.ok) {
-          const saved = json.data ?? payload
-          saveSiteDataLocal(saved)
-          return {
-            ok: true,
-            message: json.message ?? 'تم النشر على قاعدة البيانات Supabase',
-            data: saved,
-          }
-        }
-
-        if (res.status === 401) {
-          setAuthToken(null)
-          return { ok: false, message: 'انتهت الجلسة. سجّل الدخول مجدداً' }
+      if (!res) {
+        return {
+          ok: false,
+          message: 'انتهت مهلة الاتصال بالسيرفر — أعد المحاولة',
         }
       }
+
+      let json: {
+        ok?: boolean
+        message?: string
+        error?: string
+        data?: SiteData
+      } = {}
+      try {
+        json = (await res.json()) as typeof json
+      } catch {
+        return {
+          ok: false,
+          message: `فشل النشر (رمز ${res.status}) — أعد المحاولة`,
+        }
+      }
+
+      if (res.ok && json.ok) {
+        const saved = json.data ?? payload
+        saveSiteDataLocal(saved)
+        return {
+          ok: true,
+          message: json.message ?? 'تم النشر على قاعدة البيانات',
+          data: saved,
+        }
+      }
+
+      if (res.status === 401) {
+        setAuthToken(null)
+        return { ok: false, message: 'انتهت الجلسة. سجّل الدخول مجدداً' }
+      }
+
+      return {
+        ok: false,
+        message: json.error ?? `فشل النشر على السيرفر (${res.status})`,
+      }
     } catch {
-      // fall through to local publish
+      return { ok: false, message: 'تعذر الاتصال بالسيرفر أثناء النشر' }
     }
   }
 
@@ -343,7 +375,7 @@ export async function publishSiteData(
   return {
     ok: false,
     message:
-      'تعذر النشر على السيرفر — سجّل الخروج ثم الدخول مجدداً (يلزم جلسة API) ثم اضغط نشر',
+      'لا توجد جلسة نشر — سجّل الخروج ثم الدخول مجدداً ثم اضغط «نشر على الموقع»',
   }
 }
 

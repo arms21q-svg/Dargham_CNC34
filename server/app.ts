@@ -29,6 +29,11 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     service: 'dorgham-cnc-api',
     env: isProd ? 'production' : 'development',
+    ai: {
+      gemini: Boolean(process.env.GEMINI_API_KEY),
+      openai: Boolean(process.env.OPENAI_API_KEY),
+      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+    },
   })
 })
 

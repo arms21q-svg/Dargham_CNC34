@@ -150,8 +150,10 @@ export async function callGemini(
   history: ChatMessage[],
   userParts: { text?: string; inlineData?: { mimeType: string; data: string } }[]
 ): Promise<string | null> {
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const preferred = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const models = Array.from(
+    new Set([preferred, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-flash-latest'])
+  )
 
   const parts = userParts.map((part) => {
     if (part.inlineData) {
@@ -173,29 +175,44 @@ export async function callGemini(
     { role: 'user', parts },
   ]
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 700,
-      },
-    }),
-  })
+  let lastError = ''
 
-  if (!res.ok) {
-    console.error('Gemini error:', await res.text())
-    return null
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 700,
+          },
+        }),
+      })
+
+      if (!res.ok) {
+        lastError = await res.text()
+        console.error(`Gemini error (${model}):`, lastError.slice(0, 400))
+        continue
+      }
+
+      const data = (await res.json()) as {
+        candidates?: { content?: { parts?: { text?: string }[] } }[]
+      }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+      if (text) return text
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err)
+      console.error(`Gemini fetch failed (${model}):`, lastError)
+    }
   }
 
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[]
-  }
-
-  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null
+  if (lastError) console.error('Gemini all models failed:', lastError.slice(0, 400))
+  return null
 }
 
 export async function callGeminiText(
@@ -410,7 +427,11 @@ export async function handleAiChat(input: {
 
     return {
       status: 200,
-      body: { ok: true, reply: reply || fallback, mode },
+      body: {
+        ok: true,
+        reply: reply || fallback,
+        mode: reply ? mode : geminiKey || openAiKey ? 'local-after-ai-fail' : 'local',
+      },
     }
   } catch (error) {
     console.error('AI chat error:', error)

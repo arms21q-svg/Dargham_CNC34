@@ -3,6 +3,9 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
+    { "source": "/api/ai/chat", "destination": "/api/ai-chat" },
+    { "source": "/api/ai/analyze-image", "destination": "/api/ai-analyze-image" },
+    { "source": "/api/ai/search-by-image", "destination": "/api/ai-search-by-image" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -48,7 +51,7 @@
       "maxDuration": 30,
       "memory": 1024
     },
-    "api/ai/**/*.ts": {
+    "api/ai-*.ts": {
       "maxDuration": 60,
       "memory": 1024
     }

@@ -70,9 +70,10 @@ export async function resetAdminUserPassword(id: string): Promise<{
   message?: string
   error?: string
 }> {
-  const res = await fetch(apiUrl(`/api/admin-users/${id}/reset-password`), {
+  const res = await fetch(apiUrl('/api/admin-users'), {
     method: 'POST',
     headers: authHeaders(),
+    body: JSON.stringify({ action: 'reset-password', id }),
   })
 
   return (await res.json()) as {
@@ -84,9 +85,10 @@ export async function resetAdminUserPassword(id: string): Promise<{
 }
 
 export async function deleteAdminUser(id: string): Promise<{ ok: boolean; error?: string; message?: string }> {
-  const res = await fetch(apiUrl(`/api/admin-users/${id}`), {
-    method: 'DELETE',
+  const res = await fetch(apiUrl('/api/admin-users'), {
+    method: 'POST',
     headers: authHeaders(),
+    body: JSON.stringify({ action: 'delete', id }),
   })
 
   return (await res.json()) as { ok: boolean; error?: string; message?: string }

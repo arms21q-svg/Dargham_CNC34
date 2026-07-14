@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { Prisma } from '@prisma/client'
 import '../server/loadEnv.js'
 import { prisma } from '../server/db.js'
 import {
@@ -136,15 +137,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const products = body.products.map((p, i) => productFromSiteData(p, i))
       const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
 
-      // Avoid interactive $transaction — unreliable with Supabase transaction pooler
-      await prisma.siteConfig.update({ where: { id: 1 }, data: configData })
-      await prisma.product.deleteMany()
-      if (products.length > 0) {
-        await prisma.product.createMany({ data: products })
-      }
-      await prisma.manager.deleteMany()
-      if (managers.length > 0) {
-        await prisma.manager.createMany({ data: managers })
+      try {
+        // Avoid interactive $transaction — unreliable with Supabase transaction pooler
+        await prisma.siteConfig.update({
+          where: { id: 1 },
+          data: {
+            ...configData,
+            floatLinks: configData.floatLinks as Prisma.InputJsonValue,
+          },
+        })
+        await prisma.product.deleteMany()
+        if (products.length > 0) {
+          await prisma.product.createMany({ data: products })
+        }
+        await prisma.manager.deleteMany()
+        if (managers.length > 0) {
+          await prisma.manager.createMany({ data: managers })
+        }
+      } catch (dbError) {
+        console.error('site-data DB write failed', dbError)
+        throw dbError
       }
 
       try {

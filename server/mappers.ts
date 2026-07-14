@@ -106,7 +106,9 @@ export function configFromSiteData(data: SiteData, passwordHash: string) {
     addressEn: contact?.address?.en ?? '',
     whatsappMsgAr: contact?.whatsappMessage?.ar ?? '',
     whatsappMsgEn: contact?.whatsappMessage?.en ?? '',
-    floatLinks: Array.isArray(contact?.floatLinks) ? contact.floatLinks : [],
+    floatLinks: JSON.parse(
+      JSON.stringify(Array.isArray(contact?.floatLinks) ? contact.floatLinks : [])
+    ) as object[],
     aiEnabled: ai?.enabled ?? true,
     aiWelcomeAr:
       ai?.welcomeMessage?.ar ??

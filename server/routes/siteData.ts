@@ -87,24 +87,23 @@ router.put('/', requireAuth, async (req: AuthRequest, res) => {
 
     const configData = configFromSiteData(body, passwordHash)
 
-    await prisma.$transaction(async (tx) => {
-      await tx.siteConfig.update({
-        where: { id: 1 },
-        data: configData,
-      })
-      await tx.product.deleteMany()
-      await tx.manager.deleteMany()
-      if (body.products.length > 0) {
-        await tx.product.createMany({
-          data: body.products.map((p, i) => productFromSiteData(p, i)),
-        })
-      }
-      if (body.managers.length > 0) {
-        await tx.manager.createMany({
-          data: body.managers.map((m, i) => managerFromSiteData(m, i)),
-        })
-      }
+    // Avoid interactive transactions (unreliable with Supabase pgbouncer)
+    await prisma.siteConfig.update({
+      where: { id: 1 },
+      data: configData,
     })
+    await prisma.product.deleteMany()
+    await prisma.manager.deleteMany()
+    if (body.products.length > 0) {
+      await prisma.product.createMany({
+        data: body.products.map((p, i) => productFromSiteData(p, i)),
+      })
+    }
+    if (body.managers.length > 0) {
+      await prisma.manager.createMany({
+        data: body.managers.map((m, i) => managerFromSiteData(m, i)),
+      })
+    }
 
     await syncSuperAdminFromConfig(
       body.settings.adminEmail,
@@ -115,7 +114,8 @@ router.put('/', requireAuth, async (req: AuthRequest, res) => {
     res.json({ ok: true, message: 'تم النشر على قاعدة البيانات', data })
   } catch (error) {
     console.error('PUT site-data error:', error)
-    res.status(500).json({ ok: false, error: 'فشل حفظ البيانات' })
+    const message = error instanceof Error ? error.message : 'فشل حفظ البيانات'
+    res.status(500).json({ ok: false, error: message })
   }
 })
 

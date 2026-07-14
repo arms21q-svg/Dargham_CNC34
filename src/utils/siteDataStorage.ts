@@ -280,6 +280,20 @@ export async function publishSiteData(
   const payload: SiteData = { ...data, updatedAt: Date.now() }
   const token = getAuthToken()
 
+  // Prevent giant base64 payloads from silently 500'ing on Vercel
+  try {
+    const estimated = JSON.stringify(payload).length
+    if (estimated > 3_200_000) {
+      return {
+        ok: false,
+        message:
+          'حجم البيانات كبير جداً للنشر. استبدل الصور المرفوعة محلياً بروابط (URL)',
+      }
+    }
+  } catch {
+    // ignore stringify errors — API will validate
+  }
+
   if (!token) {
     if (isVercelHost()) {
       return {

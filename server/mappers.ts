@@ -85,58 +85,67 @@ export function toSiteData(
 }
 
 export function configFromSiteData(data: SiteData, passwordHash: string) {
+  const home = data.home
+  const contact = data.contact
+  const settings = data.settings
+  const ai = contact.aiAssistant
+
   return {
     version: data.version ?? 1,
-    heroTitleAr: data.home.heroTitle.ar,
-    heroTitleEn: data.home.heroTitle.en,
-    heroSubtitleAr: data.home.heroSubtitle.ar,
-    heroSubtitleEn: data.home.heroSubtitle.en,
-    heroDescAr: data.home.heroDesc.ar,
-    heroDescEn: data.home.heroDesc.en,
-    slideImages: data.home.slideImages,
-    whatsapp: data.contact.whatsapp,
-    facebook: data.contact.facebook,
-    mapsUrl: data.contact.mapsUrl,
-    addressAr: data.contact.address.ar,
-    addressEn: data.contact.address.en,
-    whatsappMsgAr: data.contact.whatsappMessage.ar,
-    whatsappMsgEn: data.contact.whatsappMessage.en,
-    floatLinks: data.contact.floatLinks ?? [],
-    aiEnabled: data.contact.aiAssistant?.enabled ?? true,
-    aiWelcomeAr: data.contact.aiAssistant?.welcomeMessage.ar ?? 'مرحباً! أنا مساعد ضرغام CNC. اسألني عن أعمالنا وخدماتنا.',
-    aiWelcomeEn: data.contact.aiAssistant?.welcomeMessage.en ?? 'Hello! I am Dorgham CNC assistant. Ask about our works and services.',
-    adminEmail: data.settings.adminEmail.trim().toLowerCase(),
+    heroTitleAr: home?.heroTitle?.ar ?? '',
+    heroTitleEn: home?.heroTitle?.en ?? '',
+    heroSubtitleAr: home?.heroSubtitle?.ar ?? '',
+    heroSubtitleEn: home?.heroSubtitle?.en ?? '',
+    heroDescAr: home?.heroDesc?.ar ?? '',
+    heroDescEn: home?.heroDesc?.en ?? '',
+    slideImages: Array.isArray(home?.slideImages) ? home.slideImages.filter(Boolean) : [],
+    whatsapp: contact?.whatsapp ?? '',
+    facebook: contact?.facebook ?? '',
+    mapsUrl: contact?.mapsUrl ?? '',
+    addressAr: contact?.address?.ar ?? '',
+    addressEn: contact?.address?.en ?? '',
+    whatsappMsgAr: contact?.whatsappMessage?.ar ?? '',
+    whatsappMsgEn: contact?.whatsappMessage?.en ?? '',
+    floatLinks: Array.isArray(contact?.floatLinks) ? contact.floatLinks : [],
+    aiEnabled: ai?.enabled ?? true,
+    aiWelcomeAr:
+      ai?.welcomeMessage?.ar ??
+      'مرحباً! أنا مساعد ضرغام CNC. اسألني عن أعمالنا وخدماتنا.',
+    aiWelcomeEn:
+      ai?.welcomeMessage?.en ??
+      'Hello! I am Dorgham CNC assistant. Ask about our works and services.',
+    adminEmail: (settings?.adminEmail ?? '').trim().toLowerCase(),
     adminPasswordHash: passwordHash,
   }
 }
 
 export function productFromSiteData(p: SiteData['products'][0], index: number) {
   return {
-    id: p.id,
-    titleAr: p.title.ar,
-    titleEn: p.title.en,
-    descriptionAr: p.description.ar,
-    descriptionEn: p.description.en,
-    category: p.category,
-    image: p.image,
-    materialsAr: p.materials.ar,
-    materialsEn: p.materials.en,
-    dimensionsAr: p.dimensions.ar,
-    dimensionsEn: p.dimensions.en,
-    featured: p.featured,
-    colors: p.colors,
+    id: String(p.id || `product-${index + 1}`),
+    titleAr: p.title?.ar ?? '',
+    titleEn: p.title?.en ?? '',
+    descriptionAr: p.description?.ar ?? '',
+    descriptionEn: p.description?.en ?? '',
+    category: p.category || 'decor',
+    image: p.image ?? '',
+    materialsAr: p.materials?.ar ?? '',
+    materialsEn: p.materials?.en ?? '',
+    dimensionsAr: p.dimensions?.ar ?? '',
+    dimensionsEn: p.dimensions?.en ?? '',
+    featured: Boolean(p.featured),
+    colors: Array.isArray(p.colors) ? p.colors : [],
     sortOrder: index,
   }
 }
 
 export function managerFromSiteData(m: SiteData['managers'][0], index: number) {
   return {
-    id: m.id,
-    nameAr: m.name.ar,
-    nameEn: m.name.en,
-    roleAr: m.role.ar,
-    roleEn: m.role.en,
-    phone: m.phone,
+    id: String(m.id || `manager-${index + 1}`),
+    nameAr: m.name?.ar ?? '',
+    nameEn: m.name?.en ?? '',
+    roleAr: m.role?.ar ?? '',
+    roleEn: m.role?.en ?? '',
+    phone: m.phone ?? '',
     whatsapp: m.whatsapp ?? null,
     sortOrder: index,
   }

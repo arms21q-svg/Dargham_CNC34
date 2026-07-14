@@ -10,6 +10,8 @@ import {
 import type { SiteData } from '../src/types/siteData'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
+/** Soft limit — huge base64 images blow past Vercel/serverless body limits. */
+const MAX_BODY_CHARS = 3_500_000
 
 async function fetchSiteData() {
   const [config, products, managers] = await Promise.all([
@@ -33,6 +35,68 @@ async function verifyBearer(req: VercelRequest): Promise<boolean> {
   }
 }
 
+function parseBody(req: VercelRequest): SiteData {
+  const raw = req.body
+  if (raw == null) {
+    throw new Error('جسم الطلب فارغ')
+  }
+  if (typeof raw === 'string') {
+    if (raw.length > MAX_BODY_CHARS) {
+      throw new Error(
+        'حجم البيانات كبير جداً. استخدم روابط صور بدلاً من رفع صور كبيرة داخل الصفحة'
+      )
+    }
+    return JSON.parse(raw) as SiteData
+  }
+  if (Buffer.isBuffer(raw)) {
+    if (raw.length > MAX_BODY_CHARS) {
+      throw new Error(
+        'حجم البيانات كبير جداً. استخدم روابط صور بدلاً من رفع صور كبيرة داخل الصفحة'
+      )
+    }
+    return JSON.parse(raw.toString('utf8')) as SiteData
+  }
+  return raw as SiteData
+}
+
+function assertSiteData(body: SiteData) {
+  if (!body?.home || !body?.contact || !body?.settings) {
+    throw new Error('بيانات غير مكتملة (home/contact/settings)')
+  }
+  if (!Array.isArray(body.products)) body.products = []
+  if (!Array.isArray(body.managers)) body.managers = []
+
+  if (!body.settings.adminEmail?.trim()) {
+    throw new Error('بريد المدير مطلوب')
+  }
+
+  for (const [i, p] of body.products.entries()) {
+    if (!p?.id) throw new Error(`منتج #${i + 1} بدون معرّف`)
+    if (!p.title?.ar && !p.title?.en) throw new Error(`منتج #${i + 1} بدون عنوان`)
+    if (typeof p.image === 'string' && p.image.startsWith('data:') && p.image.length > 900_000) {
+      throw new Error(
+        `صورة المنتج "${p.title?.ar || p.id}" كبيرة جداً. ارفعها كرابط URL`
+      )
+    }
+  }
+}
+
+function errorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return 'فشل حفظ البيانات'
+
+  const prismaError = error as Error & { code?: string; meta?: { target?: string[] } }
+  if (prismaError.code === 'P2028') {
+    return 'انتهت مهلة المعاملة مع قاعدة البيانات — أعد المحاولة'
+  }
+  if (prismaError.code === 'P2034') {
+    return 'تعارض في قاعدة البيانات — أعد المحاولة'
+  }
+  if (prismaError.message.includes('prepared statement') || prismaError.message.includes('pgbouncer')) {
+    return 'فشل الاتصال بقاعدة البيانات (PgBouncer) — أعد المحاولة'
+  }
+  return prismaError.message || 'فشل حفظ البيانات'
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === 'GET') {
@@ -52,9 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const body = (
-        typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-      ) as SiteData
+      const body = parseBody(req)
+      assertSiteData(body)
 
       const existing = await prisma.siteConfig.findUnique({ where: { id: 1 } })
       if (!existing) {
@@ -64,34 +127,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const bcrypt = (await import('bcryptjs')).default
       let passwordHash = existing.adminPasswordHash
-      if (body.settings?.adminPassword?.trim()) {
-        passwordHash = await bcrypt.hash(body.settings.adminPassword.trim(), 10)
+      const nextPassword = body.settings.adminPassword?.trim()
+      if (nextPassword) {
+        passwordHash = await bcrypt.hash(nextPassword, 10)
       }
 
       const configData = configFromSiteData(body, passwordHash)
+      const products = body.products.map((p, i) => productFromSiteData(p, i))
+      const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
 
-      await prisma.$transaction(async (tx) => {
-        await tx.siteConfig.update({ where: { id: 1 }, data: configData })
-        await tx.product.deleteMany()
-        await tx.manager.deleteMany()
-        if (body.products?.length) {
-          await tx.product.createMany({
-            data: body.products.map((p, i) => productFromSiteData(p, i)),
-          })
-        }
-        if (body.managers?.length) {
-          await tx.manager.createMany({
-            data: body.managers.map((m, i) => managerFromSiteData(m, i)),
-          })
-        }
-      })
+      // Avoid interactive $transaction — unreliable with Supabase transaction pooler
+      await prisma.siteConfig.update({ where: { id: 1 }, data: configData })
+      await prisma.product.deleteMany()
+      if (products.length > 0) {
+        await prisma.product.createMany({ data: products })
+      }
+      await prisma.manager.deleteMany()
+      if (managers.length > 0) {
+        await prisma.manager.createMany({ data: managers })
+      }
 
       try {
         const { syncSuperAdminFromConfig } = await import('../server/utils/adminUsers.js')
-        await syncSuperAdminFromConfig(
-          body.settings.adminEmail,
-          body.settings.adminPassword?.trim() || undefined
-        )
+        await syncSuperAdminFromConfig(body.settings.adminEmail, nextPassword || undefined)
       } catch (syncErr) {
         console.error('super admin sync skipped', syncErr)
       }
@@ -106,7 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('site-data error', error)
     res.status(500).json({
       ok: false,
-      error: error instanceof Error ? error.message : 'فشل معالجة البيانات',
+      error: errorMessage(error),
     })
   }
 }

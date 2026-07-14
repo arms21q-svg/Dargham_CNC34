@@ -25,11 +25,6 @@ function ProductCard({ product, showSave = true }: ProductCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
-          {product.featured && (
-            <span className="absolute top-3 start-3 rounded-lg bg-accent-warm px-2 py-1 text-xs font-semibold text-white">
-              ★
-            </span>
-          )}
         </div>
       </Link>
 

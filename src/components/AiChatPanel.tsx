@@ -150,6 +150,12 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
         return
       }
 
+      // Prefer server-provided fallback text when present
+      if (typeof json.reply === 'string' && json.reply.trim()) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: json.reply! }])
+        return
+      }
+
       const reply = await resolveFallback()
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
     } catch {

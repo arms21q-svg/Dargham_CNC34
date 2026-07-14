@@ -47,13 +47,12 @@
     }
   ],
   "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 30,
-      "memory": 1024
-    },
-    "api/ai-*.ts": {
-      "maxDuration": 60,
-      "memory": 1024
-    }
+    "api/health.ts": { "maxDuration": 30, "memory": 1024 },
+    "api/site-data.ts": { "maxDuration": 30, "memory": 1024 },
+    "api/auth/login.ts": { "maxDuration": 30, "memory": 1024 },
+    "api/save-data.ts": { "maxDuration": 10, "memory": 512 },
+    "api/ai-chat.ts": { "maxDuration": 60, "memory": 1024 },
+    "api/ai-analyze-image.ts": { "maxDuration": 60, "memory": 1024 },
+    "api/ai-search-by-image.ts": { "maxDuration": 60, "memory": 1024 }
   }
 }

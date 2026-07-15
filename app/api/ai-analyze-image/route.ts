@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  buildSiteContext,
   buildSystemPrompt,
   callGemini,
   callOpenAiVision,
-  ensureAiEnabled,
+  getAiRuntime,
   localImageAnalysis,
   parseImagePayload,
 } from '@server/aiCore'
@@ -27,22 +26,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'الصورة مطلوبة' }, { status: 400 })
     }
 
-    const gate = await ensureAiEnabled(replyLang)
-    if (!gate.ok) {
-      return NextResponse.json({ ok: false, error: gate.error }, { status: 403 })
+    const runtime = await getAiRuntime(replyLang)
+    if (!runtime.ok) {
+      return NextResponse.json({ ok: false, error: runtime.error }, { status: 403 })
     }
 
     const prompt =
       body.message?.trim() ||
       (replyLang === 'ar'
-        ? 'حلّل هذه الصورة: نوع التصميم، الألوان، الخامة المحتملة، وهل يمكن تنفيذها بتقنية CNC؟'
-        : 'Analyze this image: design type, colors, likely material, and CNC feasibility.')
+        ? 'حلّل الصورة للـ CNC: نوع، ألوان، خامة، قابلية التنفيذ.'
+        : 'Analyze image for CNC: type, colors, material, feasibility.')
 
-    const { context, whatsapp } = await buildSiteContext(replyLang)
-    const systemPrompt = buildSystemPrompt(replyLang, context, true)
+    const systemPrompt = buildSystemPrompt(replyLang, runtime.context, true)
     const geminiKey = process.env.GEMINI_API_KEY
     const openAiKey = process.env.OPENAI_API_KEY
 
+    // Prefer Gemini; OpenAI only if Gemini missing/fails — no sequential model spam beyond one retry
     if (geminiKey) {
       const reply = await callGemini(geminiKey, systemPrompt, [], [
         { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
@@ -68,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      reply: localImageAnalysis(replyLang, whatsapp || gate.whatsapp),
+      reply: localImageAnalysis(replyLang, runtime.whatsapp),
       mode: 'local-image',
     })
   } catch (error) {

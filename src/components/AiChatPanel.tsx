@@ -21,12 +21,18 @@ interface AiChatPanelProps {
   onClose: () => void
 }
 
+const HISTORY_LIMIT = 10
+
 const QUICK_QUESTIONS = {
   ar: ['ما هي أعمالكم؟', 'كم السعر؟', 'كيف أطلب تصميم؟', 'أين موقعكم؟'],
   en: ['What works do you offer?', 'What are the prices?', 'How to order custom?', 'Where are you?'],
 }
 
-function localImageReply(lang: 'ar' | 'en', siteData: ReturnType<typeof useSiteData>['siteData'], colors: string[]) {
+function localImageReply(
+  lang: 'ar' | 'en',
+  siteData: ReturnType<typeof useSiteData>['siteData'],
+  colors: string[]
+) {
   const similar = findSimilarProducts(colors, siteData.products, 3)
   const whatsapp = siteData.contact.whatsapp
 
@@ -42,6 +48,61 @@ function localImageReply(lang: 'ar' | 'en', siteData: ReturnType<typeof useSiteD
     : `Image received. We can produce similar CNC wood designs. For exact pricing contact us on WhatsApp: ${whatsapp}`
 }
 
+async function readSseChat(
+  res: Response,
+  onMeta: (meta: { mode?: string }) => void,
+  onUpdate: (fullText: string) => void
+): Promise<string> {
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('No stream')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let full = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() ?? ''
+
+    for (const part of parts) {
+      for (const line of part.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const payload = trimmed.slice(5).trim()
+        if (!payload) continue
+        try {
+          const json = JSON.parse(payload) as {
+            ok?: boolean
+            mode?: string
+            delta?: string
+            done?: boolean
+            reply?: string
+            error?: string
+          }
+          if (json.error) throw new Error(json.error)
+          if (json.mode && !json.delta) onMeta({ mode: json.mode })
+          if (typeof json.delta === 'string' && json.delta) {
+            full += json.delta
+            onUpdate(full)
+          } else if (json.done && typeof json.reply === 'string' && json.reply && !full) {
+            full = json.reply
+            onUpdate(full)
+          }
+        } catch (err) {
+          if (err instanceof SyntaxError) continue
+          throw err
+        }
+      }
+    }
+  }
+
+  return full
+}
+
 export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
   const { lang } = useApp()
   const { siteData } = useSiteData()
@@ -55,6 +116,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const [pendingImage, setPendingImage] = useState<{ base64: string; mimeType: string; preview: string } | null>(
     null
   )
@@ -65,6 +127,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
     setMessages([{ role: 'assistant', content: welcome }])
     setInput('')
     setPendingImage(null)
+    setStreaming(false)
   }, [welcome])
 
   useEffect(() => {
@@ -72,6 +135,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
       setMessages([])
       setInput('')
       setPendingImage(null)
+      setStreaming(false)
       return
     }
     resetChat()
@@ -79,7 +143,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, loading, pendingImage])
+  }, [messages, loading, streaming, pendingImage])
 
   const sendMessage = async (text: string, image?: { base64: string; mimeType: string; preview: string }) => {
     const trimmed = text.trim()
@@ -100,12 +164,17 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
     setInput('')
     setPendingImage(null)
     setLoading(true)
+    setStreaming(false)
+
+    const history = nextMessages
+      .slice(-HISTORY_LIMIT)
+      .map((m) => ({ role: m.role, content: m.content }))
 
     const fallback = image
       ? localImageReply(lang, siteData, [])
       : localAiReply(trimmed, lang, siteData)
 
-    const imageFallback = async () => {
+    const resolveFallback = async () => {
       if (!image?.preview) return fallback
       try {
         const colors = await extractColorsFromDataUrl(image.preview)
@@ -115,56 +184,102 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
       }
     }
 
-    const resolveFallback = async () => {
-      if (image) return imageFallback()
-      return fallback
+    const appendAssistant = (content: string) => {
+      setMessages((prev) => [...prev, { role: 'assistant', content }])
+    }
+
+    const updateLastAssistant = (content: string) => {
+      setMessages((prev) => {
+        const copy = [...prev]
+        const last = copy[copy.length - 1]
+        if (last?.role === 'assistant') {
+          copy[copy.length - 1] = { ...last, content }
+          return copy
+        }
+        return [...copy, { role: 'assistant', content }]
+      })
     }
 
     try {
       const res = await fetch(apiUrl('/api/ai-chat'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
         body: JSON.stringify({
           message: trimmed,
           lang,
-          history: nextMessages.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+          history,
           imageBase64: image?.base64,
           mimeType: image?.mimeType,
+          stream: true,
         }),
       })
 
+      const contentType = res.headers.get('content-type') || ''
+
+      if (res.status === 403) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string }
+        appendAssistant(json.error || (lang === 'ar' ? 'المساعد غير متاح' : 'Assistant unavailable'))
+        return
+      }
+
+      if (contentType.includes('text/event-stream') && res.ok && res.body) {
+        setStreaming(true)
+        setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+
+        const assembled = await readSseChat(
+          res,
+          () => {},
+          (fullText) => {
+            setMessages((prev) => {
+              const copy = [...prev]
+              const last = copy[copy.length - 1]
+              if (last?.role === 'assistant') {
+                copy[copy.length - 1] = { ...last, content: fullText }
+              }
+              return copy
+            })
+          }
+        )
+
+        if (!assembled.trim()) {
+          updateLastAssistant(await resolveFallback())
+        }
+        return
+      }
+
+      // JSON fallback (non-stream)
       let json: { ok?: boolean; reply?: string; error?: string } = {}
       try {
         json = (await res.json()) as typeof json
       } catch {
-        const reply = await resolveFallback()
-        setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+        appendAssistant(await resolveFallback())
         return
       }
 
       if (json.ok && json.reply) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: json.reply! }])
+        appendAssistant(json.reply)
         return
       }
 
       if (json.error && res.status === 403) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: json.error! }])
+        appendAssistant(json.error)
         return
       }
 
-      // Prefer server-provided fallback text when present
       if (typeof json.reply === 'string' && json.reply.trim()) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: json.reply! }])
+        appendAssistant(json.reply)
         return
       }
 
-      const reply = await resolveFallback()
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+      appendAssistant(await resolveFallback())
     } catch {
-      const reply = await resolveFallback()
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+      appendAssistant(await resolveFallback())
     } finally {
       setLoading(false)
+      setStreaming(false)
     }
   }
 
@@ -184,6 +299,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
   if (!open) return null
 
   const whatsappUrl = getWhatsAppUrl(siteData.contact, lang)
+  const showTyping = loading && !streaming
 
   return (
     <div className="w-[min(92vw,340px)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
@@ -228,13 +344,14 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[88%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${
+              className={`max-w-[88%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
                   ? 'rounded-ee-sm bg-primary-600 text-white'
                   : 'rounded-es-sm bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
               }`}
             >
               {msg.imagePreview && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={msg.imagePreview}
                   alt=""
@@ -242,10 +359,13 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
                 />
               )}
               {msg.content}
+              {streaming && index === messages.length - 1 && msg.role === 'assistant' && (
+                <span className="ms-0.5 inline-block h-3 w-0.5 animate-pulse bg-primary-500 align-middle" />
+              )}
             </div>
           </div>
         ))}
-        {loading && (
+        {showTyping && (
           <div className="flex justify-start">
             <div className="rounded-2xl rounded-es-sm bg-gray-100 px-3 py-2 text-sm dark:bg-gray-800">
               <span className="inline-flex gap-1">
@@ -280,6 +400,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
       {pendingImage && (
         <div className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">
           <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={pendingImage.preview} alt="" className="h-14 w-14 rounded-lg object-cover" />
             <p className="flex-1 text-xs text-gray-500 dark:text-gray-400">
               {lang === 'ar' ? 'صورة جاهزة للإرسال' : 'Image ready to send'}

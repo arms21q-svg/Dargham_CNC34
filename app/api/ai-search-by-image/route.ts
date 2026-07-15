@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  buildSiteContext,
   callGemini,
   callOpenAiVision,
-  ensureAiEnabled,
   extractProductIds,
+  getAiRuntime,
   parseImagePayload,
 } from '@server/aiCore'
 
@@ -25,20 +24,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'الصورة مطلوبة' }, { status: 400 })
     }
 
-    const gate = await ensureAiEnabled(replyLang)
-    if (!gate.ok) {
-      return NextResponse.json({ ok: false, error: gate.error }, { status: 403 })
+    const runtime = await getAiRuntime(replyLang)
+    if (!runtime.ok) {
+      return NextResponse.json({ ok: false, error: runtime.error }, { status: 403 })
     }
 
-    const { context, products } = await buildSiteContext(replyLang)
-    const validIds = new Set(products.map((p) => p.id))
-
+    const validIds = new Set(runtime.productIds)
     const searchPrompt =
       replyLang === 'ar'
-        ? `أنت نظام مطابقة صور. قارن الصورة مع الأعمال أدناه. أعد فقط JSON array من ids.
-${context}`
-        : `Compare the image with works below. Return ONLY a JSON array of ids.
-${context}`
+        ? `طابق الصورة مع الكتالوج. أعد JSON array من ids فقط.\n${runtime.context}`
+        : `Match image to catalog. Return ONLY a JSON array of ids.\n${runtime.context}`
 
     const geminiKey = process.env.GEMINI_API_KEY
     const openAiKey = process.env.OPENAI_API_KEY
@@ -49,7 +44,7 @@ ${context}`
     if (geminiKey) {
       const reply = await callGemini(geminiKey, searchPrompt, [], [
         { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
-        { text: replyLang === 'ar' ? 'أوجد أقرب الأعمال.' : 'Find closest works.' },
+        { text: replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?' },
       ])
       if (reply) {
         productIds = extractProductIds(reply, validIds)
@@ -62,7 +57,7 @@ ${context}`
       const reply = await callOpenAiVision(
         openAiKey,
         searchPrompt,
-        replyLang === 'ar' ? 'أوجد أقرب الأعمال.' : 'Find closest works.',
+        replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?',
         image.imageBase64,
         image.mimeType
       )

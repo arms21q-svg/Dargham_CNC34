@@ -1,6 +1,7 @@
 'use client'
 
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import BrandSplash from '@/components/BrandSplash'
@@ -31,13 +32,29 @@ function DeferredFloat() {
   )
 }
 
+function PageTransition({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [pathname])
+
+  return (
+    <div key={pathname} className="animate-fade-in">
+      {children}
+    </div>
+  )
+}
+
 export default function PublicShell({ children }: { children: ReactNode }) {
   return (
     <>
       <BrandSplash skip={false} />
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <Footer />
         <DeferredFloat />
       </div>

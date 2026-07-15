@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useApp } from '../context/AppContext'
@@ -19,12 +19,19 @@ function Header() {
     { to: '/saved', label: t.nav.saved },
   ]
 
-  const isActive = (path: string) => pathname === path
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
+
+  const isActive = (path: string) => {
+    if (path === '/') return pathname === '/'
+    return pathname === path || pathname.startsWith(`${path}/`)
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-md dark:border-gray-800 dark:bg-surface-dark/90">
       <div className="container-main flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2" prefetch>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-lg font-bold text-white">
             D
           </div>
@@ -33,15 +40,16 @@ function Header() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-1 lg:flex" aria-label={lang === 'ar' ? 'القائمة الرئيسية' : 'Main menu'}>
           {links.map((link) => (
             <Link
               key={link.to}
               href={link.to}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              prefetch
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
                 isActive(link.to)
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
-                  : 'text-gray-600 hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-primary-400'
               }`}
             >
               {link.label}
@@ -85,6 +93,7 @@ function Header() {
             onClick={() => setMenuOpen(!menuOpen)}
             className="btn-ghost !p-2 lg:hidden"
             aria-label="Menu"
+            aria-expanded={menuOpen}
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {menuOpen ? (
@@ -98,17 +107,21 @@ function Header() {
       </div>
 
       {menuOpen && (
-        <nav className="border-t border-gray-100 px-4 py-4 lg:hidden dark:border-gray-800">
+        <nav
+          className="animate-fade-in border-t border-gray-100 px-4 py-4 lg:hidden dark:border-gray-800"
+          aria-label={lang === 'ar' ? 'قائمة الموبايل' : 'Mobile menu'}
+        >
           <div className="flex flex-col gap-1">
             {links.map((link) => (
               <Link
                 key={link.to}
                 href={link.to}
+                prefetch
                 onClick={() => setMenuOpen(false)}
-                className={`rounded-lg px-4 py-3 font-medium transition-colors ${
+                className={`rounded-lg px-4 py-3 font-medium transition-colors duration-200 ${
                   isActive(link.to)
                     ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
-                    : 'text-gray-600 dark:text-gray-300'
+                    : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
                 }`}
               >
                 {link.label}

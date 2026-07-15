@@ -9,7 +9,7 @@ const links = [
   { to: '/admin/home', label: 'الصفحة الرئيسية' },
   { to: '/admin/works', label: 'أعمالنا' },
   { to: '/admin/contact', label: 'روابط التواصل' },
-  { to: '/admin/managers', label: 'المسؤولين' },
+  { to: '/admin/managers', label: 'حسابات المستخدمين' },
 ]
 
 export default function AdminSidebar() {

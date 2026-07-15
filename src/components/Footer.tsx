@@ -29,6 +29,9 @@ export default function Footer() {
               {lang === 'ar' ? 'روابط سريعة' : 'Quick Links'}
             </h3>
             <div className="flex flex-col gap-2">
+              <Link href="/" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+                {t.nav.home}
+              </Link>
               <Link href="/works" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
                 {t.nav.works}
               </Link>
@@ -40,6 +43,9 @@ export default function Footer() {
               </Link>
               <Link href="/contact" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
                 {t.nav.contact}
+              </Link>
+              <Link href="/saved" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+                {t.nav.saved}
               </Link>
             </div>
           </div>

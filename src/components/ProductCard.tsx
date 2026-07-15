@@ -9,9 +9,10 @@ import OptimizedImage from './OptimizedImage'
 interface ProductCardProps {
   product: Product
   showSave?: boolean
+  similarityScore?: number
 }
 
-function ProductCard({ product, showSave = true }: ProductCardProps) {
+function ProductCard({ product, showSave = true, similarityScore }: ProductCardProps) {
   const { lang, t, isSaved, toggleSave } = useApp()
   const saved = isSaved(product.id)
 
@@ -27,6 +28,11 @@ function ProductCard({ product, showSave = true }: ProductCardProps) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
+          {typeof similarityScore === 'number' && (
+            <span className="absolute start-3 top-3 z-10 rounded-full bg-black/75 px-2.5 py-1 text-xs font-bold text-white shadow-lg backdrop-blur-sm">
+              {similarityScore}%
+            </span>
+          )}
         </div>
       </Link>
 

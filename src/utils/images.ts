@@ -40,15 +40,11 @@ export function imageSrcSet(
     .join(', ')
 }
 
+/** Warm cache without <link rel="preload"> (avoids unused-preload warnings with next/image). */
 export function preloadImage(url: string, opts: ImageOpts = {}) {
   if (typeof document === 'undefined' || !url) return
   const href = optimizeImageUrl(url, opts)
-  if (document.querySelector(`link[rel="preload"][href="${href}"]`)) return
-
-  const link = document.createElement('link')
-  link.rel = 'preload'
-  link.as = 'image'
-  link.href = href
-  link.setAttribute('fetchpriority', 'high')
-  document.head.appendChild(link)
+  const img = new window.Image()
+  img.decoding = 'async'
+  img.src = href
 }

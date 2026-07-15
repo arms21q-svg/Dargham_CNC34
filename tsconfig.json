@@ -44,6 +44,7 @@
     "server/db.ts",
     "server/mappers.ts",
     "server/aiCore.ts",
+    "server/vectorSearch.ts",
     "server/vercelAuth.ts",
     "server/utils/adminUsers.ts",
     "server/loadEnv.ts",

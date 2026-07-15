@@ -11,6 +11,14 @@ import {
   parseImagePayload,
   type ChatMessage,
 } from '../aiCore'
+import {
+  analyzeImageStructured,
+  loadCatalogForLocal,
+  localTagRank,
+  searchProductsByImageEmbeddings,
+  type ImageAnalysis,
+  type ScoredMatch,
+} from '../vectorSearch'
 
 const router = Router()
 
@@ -100,6 +108,16 @@ router.post('/analyze-image', async (req, res) => {
   }
 })
 
+function analysisToNote(analysis: ImageAnalysis | null, lang: 'ar' | 'en') {
+  if (!analysis) return undefined
+  const parts = [
+    analysis.workType,
+    analysis.materials.slice(0, 3).join(lang === 'ar' ? '، ' : ', '),
+    analysis.design,
+  ].filter(Boolean)
+  return parts.join(' · ') || analysis.summary || undefined
+}
+
 router.post('/search-by-image', async (req, res) => {
   const { lang = 'ar', imageBase64, mimeType } = req.body as {
     lang?: 'ar' | 'en'
@@ -122,61 +140,90 @@ router.post('/search-by-image', async (req, res) => {
       return
     }
 
-    const { context, products } = await buildSiteContext(replyLang)
-    const validIds = new Set(products.map((p) => p.id))
-
-    const searchPrompt =
-      replyLang === 'ar'
-        ? `أنت نظام مطابقة صور. قارن الصورة المرفقة مع قائمة الأعمال أدناه.
-أعد فقط JSON array بمعرّفات id للأعمال الأكثر تشابهاً (3 إلى 6 ids) بدون أي نص آخر.
-مثال: ["id1","id2"]
-
-${context}`
-        : `You are an image matching system. Compare the attached image with the works list below.
-Return ONLY a JSON array of the most similar work ids (3 to 6 ids), no other text.
-Example: ["id1","id2"]
-
-${context}`
-
     const geminiKey = process.env.GEMINI_API_KEY
-    const openAiKey = process.env.OPENAI_API_KEY
-    let productIds: string[] = []
-    let analysis: string | undefined
+    let matches: ScoredMatch[] = []
+    let analysis: ImageAnalysis | null = null
+    let softMatch = true
     let mode = 'local'
 
     if (geminiKey) {
-      const reply = await callGemini(geminiKey, searchPrompt, [], [
-        { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
-        { text: replyLang === 'ar' ? 'أوجد أقرب الأعمال.' : 'Find closest works.' },
-      ])
-
-      if (reply) {
-        productIds = extractProductIds(reply, validIds)
-        analysis = reply
-        mode = 'gemini-vision'
-      }
-    }
-
-    if (productIds.length === 0 && openAiKey) {
-      const reply = await callOpenAiVision(
-        openAiKey,
-        searchPrompt,
-        replyLang === 'ar' ? 'أوجد أقرب الأعمال.' : 'Find closest works.',
+      const embedded = await searchProductsByImageEmbeddings(
+        geminiKey,
         image.imageBase64,
-        image.mimeType
+        image.mimeType,
+        replyLang
       )
-
-      if (reply) {
-        productIds = extractProductIds(reply, validIds)
-        analysis = reply
-        mode = 'openai-vision'
+      if (embedded?.matches.length) {
+        matches = embedded.matches
+        analysis = embedded.analysis
+        softMatch = embedded.softMatch
+        mode = embedded.mode
       }
     }
 
-    res.json({ ok: true, productIds, analysis, mode })
+    if (matches.length === 0) {
+      const { context, products } = await buildSiteContext(replyLang)
+      const validIds = new Set(products.map((p) => p.id))
+      const searchPrompt =
+        replyLang === 'ar'
+          ? `طابق الصورة مع الكتالوج. أعد JSON array من ids فقط.\n${context}`
+          : `Match image to catalog. Return ONLY a JSON array of ids.\n${context}`
+
+      analysis =
+        analysis ||
+        (geminiKey
+          ? await analyzeImageStructured(geminiKey, image.imageBase64, image.mimeType, replyLang)
+          : null)
+
+      const openAiKey = process.env.OPENAI_API_KEY
+      let productIds: string[] = []
+
+      if (geminiKey) {
+        const reply = await callGemini(geminiKey, searchPrompt, [], [
+          { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
+          { text: replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?' },
+        ])
+        if (reply) {
+          productIds = extractProductIds(reply, validIds)
+          mode = 'gemini-vision'
+        }
+      }
+
+      if (productIds.length === 0 && openAiKey) {
+        const reply = await callOpenAiVision(
+          openAiKey,
+          searchPrompt,
+          replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?',
+          image.imageBase64,
+          image.mimeType
+        )
+        if (reply) {
+          productIds = extractProductIds(reply, validIds)
+          mode = 'openai-vision'
+        }
+      }
+
+      matches = productIds.map((id, i) => ({ id, score: Math.max(70, 98 - i * 4) }))
+
+      if (matches.length === 0 && analysis) {
+        matches = localTagRank(analysis, await loadCatalogForLocal())
+        mode = 'local-tags'
+      }
+      softMatch = matches.length === 0 || (matches[0]?.score ?? 0) < 58
+    }
+
+    res.json({
+      ok: true,
+      productIds: matches.map((m) => m.id),
+      matches,
+      analysis,
+      softMatch,
+      analysisNote: analysisToNote(analysis, replyLang),
+      mode,
+    })
   } catch (error) {
     console.error('Search by image error:', error)
-    res.json({ ok: true, productIds: [], mode: 'local' })
+    res.json({ ok: true, productIds: [], matches: [], softMatch: true, mode: 'local' })
   }
 })
 

@@ -31,6 +31,11 @@ export interface Translations {
     searchPlaceholder: string
     searchByImage: string
     uploadImage: string
+    takePhoto: string
+    analyzingImage: string
+    imageSearchHint: string
+    softMatchNote: string
+    resultsCount: string
     noResults: string
     save: string
     saved: string
@@ -123,8 +128,13 @@ export const translations: Record<Lang, Translations> = {
       categories: 'التصنيفات',
       search: 'بحث',
       searchPlaceholder: 'ابحث عن تصميم...',
-      searchByImage: 'بحث بالصورة',
+      searchByImage: 'البحث بواسطة صورة',
       uploadImage: 'اسحب صورة هنا أو اضغط للرفع',
+      takePhoto: 'التقاط بالكاميرا',
+      analyzingImage: 'جاري تحليل الصورة...',
+      imageSearchHint: 'ارفع صورة أو التقطها بالكاميرا لنبحث عن أقرب الأعمال بالذكاء الاصطناعي',
+      softMatchNote: 'لم نجد تطابقاً دقيقاً — نعرض أعمالاً مشابهة',
+      resultsCount: 'نتيجة',
       noResults: 'لا توجد نتائج مطابقة',
       save: 'حفظ',
       saved: 'محفوظ',
@@ -250,6 +260,11 @@ export const translations: Record<Lang, Translations> = {
       searchPlaceholder: 'Search for a design...',
       searchByImage: 'Search by Image',
       uploadImage: 'Drop an image here or click to upload',
+      takePhoto: 'Take a photo',
+      analyzingImage: 'Analyzing image...',
+      imageSearchHint: 'Upload or take a photo to find the most similar works with AI',
+      softMatchNote: 'No exact match found — showing similar works',
+      resultsCount: 'results',
       noResults: 'No matching results found',
       save: 'Save',
       saved: 'Saved',

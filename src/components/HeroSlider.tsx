@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useSiteData } from '../context/SiteDataContext'
 import OptimizedImage from './OptimizedImage'
-import { preloadImage } from '../utils/images'
 
 interface HeroSliderProps {
   side?: boolean
@@ -13,12 +12,6 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
   const { siteData } = useSiteData()
   const slideImages = siteData.home.slideImages
   const [current, setCurrent] = useState(0)
-
-  useEffect(() => {
-    if (slideImages[0]) {
-      preloadImage(slideImages[0], { width: 900, quality: 78 })
-    }
-  }, [slideImages])
 
   useEffect(() => {
     if (slideImages.length <= 1) return
@@ -40,13 +33,6 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
       clearTimeout(timer)
     }
   }, [slideImages.length])
-
-  // Prefetch next slide only (reduces bandwidth vs loading all)
-  useEffect(() => {
-    if (slideImages.length < 2) return
-    const next = slideImages[(current + 1) % slideImages.length]
-    if (next) preloadImage(next, { width: 900, quality: 72 })
-  }, [current, slideImages])
 
   if (slideImages.length === 0) {
     return (

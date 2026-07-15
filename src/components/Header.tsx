@@ -4,20 +4,17 @@ import { memo, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+import { PUBLIC_PAGES } from '../data/publicPages'
 
 function Header() {
   const { lang, setLang, t, isDark, toggleTheme } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
   const pathname = usePathname()
 
-  const links = [
-    { to: '/', label: t.nav.home },
-    { to: '/works', label: t.nav.works },
-    { to: '/about', label: t.nav.about },
-    { to: '/faq', label: t.nav.faq },
-    { to: '/contact', label: t.nav.contact },
-    { to: '/saved', label: t.nav.saved },
-  ]
+  const links = PUBLIC_PAGES.map((page) => ({
+    to: page.path,
+    label: t.nav[page.navKey],
+  }))
 
   useEffect(() => {
     setMenuOpen(false)
@@ -25,28 +22,32 @@ function Header() {
 
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/'
+    if (path === '/works') return pathname === '/works'
     return pathname === path || pathname.startsWith(`${path}/`)
   }
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-md dark:border-gray-800 dark:bg-surface-dark/90">
-      <div className="container-main flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2" prefetch>
+      <div className="container-main flex items-center justify-between gap-2 px-3 py-3 sm:px-6 lg:px-8">
+        <Link href="/" className="flex shrink-0 items-center gap-2" prefetch>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600 text-lg font-bold text-white">
             D
           </div>
-          <span className="text-lg font-bold text-primary-700 dark:text-primary-300">
+          <span className="hidden text-lg font-bold text-primary-700 dark:text-primary-300 sm:inline">
             {lang === 'ar' ? 'ضرغام CNC' : 'Dorgham CNC'}
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex" aria-label={lang === 'ar' ? 'القائمة الرئيسية' : 'Main menu'}>
+        <nav
+          className="hidden max-w-full flex-1 flex-wrap items-center justify-center gap-0.5 md:flex"
+          aria-label={lang === 'ar' ? 'القائمة الرئيسية' : 'Main menu'}
+        >
           {links.map((link) => (
             <Link
               key={link.to}
               href={link.to}
               prefetch
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
+              className={`rounded-lg px-2.5 py-2 text-xs font-medium transition-colors duration-200 lg:px-3 lg:text-sm ${
                 isActive(link.to)
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-primary-400'
@@ -57,7 +58,7 @@ function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <button type="button" onClick={toggleTheme} className="btn-ghost !p-2" aria-label="Toggle theme">
             {isDark ? (
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -91,7 +92,7 @@ function Header() {
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="btn-ghost !p-2 lg:hidden"
+            className="btn-ghost !p-2 md:hidden"
             aria-label="Menu"
             aria-expanded={menuOpen}
           >
@@ -108,7 +109,7 @@ function Header() {
 
       {menuOpen && (
         <nav
-          className="animate-fade-in border-t border-gray-100 px-4 py-4 lg:hidden dark:border-gray-800"
+          className="animate-fade-in border-t border-gray-100 px-4 py-4 md:hidden dark:border-gray-800"
           aria-label={lang === 'ar' ? 'قائمة الموبايل' : 'Mobile menu'}
         >
           <div className="flex flex-col gap-1">

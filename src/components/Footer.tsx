@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useApp } from '../context/AppContext'
+import { PUBLIC_PAGES } from '../data/publicPages'
 import SocialLinks from './SocialLinks'
 
 export default function Footer() {
@@ -26,27 +27,18 @@ export default function Footer() {
 
           <div>
             <h3 className="mb-4 font-semibold text-gray-800 dark:text-gray-200">
-              {lang === 'ar' ? 'روابط سريعة' : 'Quick Links'}
+              {lang === 'ar' ? 'صفحات الموقع' : 'Site pages'}
             </h3>
             <div className="flex flex-col gap-2">
-              <Link href="/" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
-                {t.nav.home}
-              </Link>
-              <Link href="/works" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
-                {t.nav.works}
-              </Link>
-              <Link href="/about" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
-                {t.nav.about}
-              </Link>
-              <Link href="/faq" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
-                {t.nav.faq}
-              </Link>
-              <Link href="/contact" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
-                {t.nav.contact}
-              </Link>
-              <Link href="/saved" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
-                {t.nav.saved}
-              </Link>
+              {PUBLIC_PAGES.map((page) => (
+                <Link
+                  key={page.path}
+                  href={page.path}
+                  className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400"
+                >
+                  {t.nav[page.navKey]}
+                </Link>
+              ))}
             </div>
           </div>
 

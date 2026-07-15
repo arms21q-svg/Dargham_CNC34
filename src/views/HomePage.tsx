@@ -6,7 +6,6 @@ import HeroSlider from '../components/HeroSlider'
 import ProductCard from '../components/ProductCard'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
-import { PUBLIC_PAGES } from '../data/publicPages'
 
 export default function HomePage() {
   const { lang, t } = useApp()
@@ -112,26 +111,6 @@ export default function HomePage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {featured.map((product) => (
               <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-padding">
-        <div className="container-main text-center">
-          <h2 className="mb-3 text-3xl font-bold text-gray-800 dark:text-gray-100">
-            {lang === 'ar' ? 'صفحات الموقع' : 'Browse the site'}
-          </h2>
-          <div className="mx-auto mb-8 h-1 w-16 rounded-full bg-primary-500" />
-          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-3">
-            {PUBLIC_PAGES.map((page) => (
-              <Link
-                key={page.path}
-                href={page.path}
-                className="rounded-xl border border-primary-200 bg-white px-4 py-2.5 text-sm font-medium text-primary-800 transition-colors hover:bg-primary-50 dark:border-primary-800 dark:bg-gray-900 dark:text-primary-200 dark:hover:bg-primary-950"
-              >
-                {t.nav[page.navKey]}
-              </Link>
             ))}
           </div>
         </div>

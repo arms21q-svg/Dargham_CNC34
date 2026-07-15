@@ -396,14 +396,35 @@ export async function publishSiteData(
   }
 }
 
+export function normalizeWhatsAppPhone(raw: string): string {
+  let digits = (raw || '').replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('00')) digits = digits.slice(2)
+  // رقم عراقي محلي مثل 07xxxxxxxx → 9647xxxxxxxx
+  if (digits.startsWith('0') && digits.length >= 10) {
+    digits = `964${digits.slice(1)}`
+  }
+  return digits
+}
+
 export function getWhatsAppUrl(
   contact: SiteData['contact'],
   lang: 'ar' | 'en',
   customText?: string
 ) {
-  const phone = contact.whatsapp.replace(/\D/g, '')
-  const text = encodeURIComponent(customText ?? contact.whatsappMessage[lang])
-  return `https://wa.me/${phone}?text=${text}`
+  const phone = normalizeWhatsAppPhone(contact.whatsapp)
+  const text = encodeURIComponent(customText ?? contact.whatsappMessage[lang] ?? '')
+  if (!phone) return 'https://wa.me/?text=' + text
+  return `https://api.whatsapp.com/send?phone=${phone}&text=${text}`
+}
+
+export function openWhatsApp(url: string) {
+  if (typeof window === 'undefined') return
+  const opened = window.open(url, '_blank', 'noopener,noreferrer')
+  // بعض المتصفحات تمنع النوافذ المنبثقة من زر النموذج
+  if (!opened || opened.closed || typeof opened.closed === 'undefined') {
+    window.location.assign(url)
+  }
 }
 
 export interface ContactFormPayload {

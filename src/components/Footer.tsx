@@ -27,18 +27,21 @@ export default function Footer() {
 
           <div>
             <h3 className="mb-4 font-semibold text-gray-800 dark:text-gray-200">
-              {lang === 'ar' ? 'صفحات الموقع' : 'Site pages'}
+              {lang === 'ar' ? 'روابط سريعة' : 'Quick Links'}
             </h3>
             <div className="flex flex-col gap-2">
-              {PUBLIC_PAGES.map((page) => (
-                <Link
-                  key={page.path}
-                  href={page.path}
-                  className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400"
-                >
-                  {t.nav[page.navKey]}
-                </Link>
-              ))}
+              <Link href="/works" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+                {t.nav.works}
+              </Link>
+              <Link href="/about" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+                {t.nav.about}
+              </Link>
+              <Link href="/faq" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+                {t.nav.faq}
+              </Link>
+              <Link href="/contact" className="text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400">
+                {t.nav.contact}
+              </Link>
             </div>
           </div>
 
@@ -50,8 +53,24 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 border-t border-gray-100 pt-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-          © {year} {lang === 'ar' ? 'ضرغام CNC' : 'Dorgham CNC'}. {t.footer.rights}
+        <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-800">
+          <nav
+            className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-gray-500 dark:text-gray-400"
+            aria-label={lang === 'ar' ? 'صفحات الموقع' : 'Site pages'}
+          >
+            {PUBLIC_PAGES.map((page) => (
+              <Link
+                key={page.path}
+                href={page.path}
+                className="hover:text-primary-600 dark:hover:text-primary-400"
+              >
+                {t.nav[page.navKey]}
+              </Link>
+            ))}
+          </nav>
+          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            © {year} {lang === 'ar' ? 'ضرغام CNC' : 'Dorgham CNC'}. {t.footer.rights}
+          </p>
         </div>
       </div>
     </footer>

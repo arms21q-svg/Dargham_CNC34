@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 import SocialLinks from '../components/SocialLinks'
-import { getContactFormWhatsAppUrl, getWhatsAppUrl } from '../utils/siteDataStorage'
+import { getContactFormWhatsAppUrl, getWhatsAppUrl, openWhatsApp, normalizeWhatsAppPhone } from '../utils/siteDataStorage'
 
 const emptyForm = { name: '', email: '', phone: '', message: '' }
 
@@ -18,8 +18,17 @@ export default function ContactPage() {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
 
+    if (!normalizeWhatsAppPhone(contact.whatsapp)) {
+      alert(
+        lang === 'ar'
+          ? 'رقم واتساب غير مضبوط. حدّثه من لوحة التحكم → روابط التواصل'
+          : 'WhatsApp number is missing. Set it in Admin → Contact links'
+      )
+      return
+    }
+
     const url = getContactFormWhatsAppUrl(contact, lang, form)
-    window.open(url, '_blank', 'noopener,noreferrer')
+    openWhatsApp(url)
     setSent(true)
   }
 

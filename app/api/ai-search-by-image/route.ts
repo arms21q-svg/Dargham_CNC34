@@ -6,7 +6,9 @@ import {
   getAiRuntime,
   parseImagePayload,
 } from '@server/aiCore'
+import { getGeminiApiKey } from '@server/geminiClient'
 import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
+import { scheduleProductImageReindex } from '@server/imageIndex'
 import {
   analyzeImageStructured,
   loadCatalogForLocal,
@@ -29,27 +31,34 @@ function analysisToNote(analysis: ImageAnalysis | null, lang: 'ar' | 'en') {
   return parts.join(' · ') || analysis.summary || undefined
 }
 
-type RuntimeOk = Extract<Awaited<ReturnType<typeof getAiRuntime>>, { ok: true }>
-
+/** Vision match against FULL catalog ids (not the chat-limited 8). */
 async function visionFallback(
   imageBase64: string,
   mimeType: string,
   replyLang: 'ar' | 'en',
-  runtime: RuntimeOk,
   existingAnalysis: ImageAnalysis | null
 ): Promise<{ matches: ScoredMatch[]; analysis: ImageAnalysis | null; mode: string }> {
-  const geminiKey = process.env.GEMINI_API_KEY
-  const analysis =
-    existingAnalysis ||
-    (geminiKey
-      ? await analyzeImageStructured(geminiKey, imageBase64, mimeType, replyLang)
-      : null)
+  const products = await loadCatalogForLocal()
+  const validIds = new Set(products.map((p) => p.id))
+  const catalogLines = products
+    .slice(0, 40)
+    .map((p) => {
+      const title = replyLang === 'ar' ? p.titleAr : p.titleEn
+      return `${p.id}:${title} (${p.category})`
+    })
+    .join('\n')
 
-  const validIds = new Set(runtime.productIds)
+  const geminiKey = getGeminiApiKey()
+  let analysis = existingAnalysis
+
+  if (!analysis && geminiKey) {
+    analysis = await analyzeImageStructured(geminiKey, imageBase64, mimeType, replyLang)
+  }
+
   const searchPrompt =
     replyLang === 'ar'
-      ? `طابق الصورة مع الكتالوج. أعد JSON array من ids فقط مرتبة من الأكثر تشابهاً.\n${runtime.context}`
-      : `Match image to catalog. Return ONLY a JSON array of ids ordered by similarity.\n${runtime.context}`
+      ? `طابق الصورة مع كتالوج الأعمال. أعد JSON array من ids مرتبة من الأكثر تشابهاً فقط.\nCatalog:\n${catalogLines}`
+      : `Match the image to the works catalog. Return ONLY a JSON array of ids ordered by similarity.\nCatalog:\n${catalogLines}`
 
   const openAiKey = process.env.OPENAI_API_KEY
   let productIds: string[] = []
@@ -63,6 +72,8 @@ async function visionFallback(
     if (result.ok && result.text) {
       productIds = extractProductIds(result.text, validIds)
       mode = 'gemini-vision'
+    } else if (result.kind === 'quota') {
+      console.error('[ai] vision fallback quota 429 — using tags/local')
     }
   }
 
@@ -86,7 +97,6 @@ async function visionFallback(
   }))
 
   if (matches.length === 0 && analysis) {
-    const products = await loadCatalogForLocal()
     return { matches: localTagRank(analysis, products), analysis, mode: 'local-tags' }
   }
 
@@ -95,7 +105,7 @@ async function visionFallback(
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(`ai-search:${clientIp(req)}`, 15, 60_000)
+    const limited = rateLimit(`ai-search:${clientIp(req)}`, 20, 60_000)
     if (!limited.ok) return rateLimitResponse(limited.retryAfter)
 
     const body = (await req.json().catch(() => ({}))) as {
@@ -110,7 +120,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'الصورة مطلوبة' }, { status: 400 })
     }
 
-    // Cap payload size (~4MB base64)
     if (image.imageBase64.length > 5_500_000) {
       return NextResponse.json({ ok: false, error: 'الصورة كبيرة جداً' }, { status: 413 })
     }
@@ -120,41 +129,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: runtime.error }, { status: 403 })
     }
 
-    const geminiKey = process.env.GEMINI_API_KEY
+    // Kick background indexing for any new products
+    scheduleProductImageReindex()
+
+    const geminiKey = getGeminiApiKey()
     let matches: ScoredMatch[] = []
     let analysis: ImageAnalysis | null = null
     let softMatch = true
     let mode = 'local'
 
-    if (geminiKey) {
-      const embedded = await searchProductsByImageEmbeddings(
-        geminiKey,
-        image.imageBase64,
-        image.mimeType,
-        replyLang
-      )
-      if (embedded?.matches.length) {
-        matches = embedded.matches
-        analysis = embedded.analysis
-        softMatch = embedded.softMatch
-        mode = embedded.mode
-      } else if (embedded?.analysis) {
-        analysis = embedded.analysis
-      }
+    // Visual DB index first — works even when Gemini returns 429
+    const embedded = await searchProductsByImageEmbeddings(
+      geminiKey,
+      image.imageBase64,
+      image.mimeType,
+      replyLang
+    )
+
+    if (embedded?.matches.length) {
+      matches = embedded.matches
+      analysis = embedded.analysis
+      softMatch = embedded.softMatch
+      mode = embedded.mode
+    } else if (embedded?.analysis) {
+      analysis = embedded.analysis
     }
 
-    if (matches.length === 0) {
-      const fallback = await visionFallback(
-        image.imageBase64,
-        image.mimeType,
-        replyLang,
-        runtime,
-        analysis
-      )
-      matches = fallback.matches
-      analysis = fallback.analysis ?? analysis
-      softMatch = matches.length === 0 || (matches[0]?.score ?? 0) < 72
-      mode = fallback.mode
+    // Only call vision if visual search found nothing useful
+    if (!matches.length || (matches[0].score < 55 && geminiKey)) {
+      try {
+        const fallback = await visionFallback(
+          image.imageBase64,
+          image.mimeType,
+          replyLang,
+          analysis
+        )
+        if (fallback.matches.length) {
+          // Merge: keep higher visual scores, append vision-only ids
+          const byId = new Map(matches.map((m) => [m.id, m.score]))
+          for (const m of fallback.matches) {
+            const prev = byId.get(m.id) ?? 0
+            byId.set(m.id, Math.max(prev, m.score))
+          }
+          matches = Array.from(byId.entries())
+            .map(([id, score]) => ({ id, score }))
+            .sort((a, b) => b.score - a.score)
+          analysis = fallback.analysis ?? analysis
+          softMatch = matches[0].score < 78
+          mode = matches[0].score >= 90 ? mode : `${mode}+${fallback.mode}`
+        }
+      } catch (err) {
+        console.error('[ai] vision fallback', err instanceof Error ? err.message : err)
+      }
     }
 
     return NextResponse.json({
@@ -167,7 +193,7 @@ export async function POST(req: NextRequest) {
       mode,
     })
   } catch (error) {
-    console.error('ai-search-by-image', error)
+    console.error('[ai] search-by-image', error instanceof Error ? error.message : error)
     return NextResponse.json({
       ok: true,
       productIds: [],

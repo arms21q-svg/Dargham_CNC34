@@ -7,6 +7,7 @@ import {
   productFromSiteData,
   toSiteData,
 } from '@server/mappers'
+import { scheduleProductImageReindex } from '@server/imageIndex'
 import { verifyBearerHeader } from '@server/vercelAuth'
 import type { SiteData } from '@/types/siteData'
 
@@ -147,6 +148,9 @@ export async function PUT(req: NextRequest) {
     } catch (syncErr) {
       console.error('super admin sync skipped', syncErr)
     }
+
+    // Rebuild visual search index for gallery image matching
+    scheduleProductImageReindex(products.map((p) => p.id))
 
     const data = await fetchSiteData()
     return NextResponse.json({ ok: true, message: 'تم النشر على قاعدة البيانات', data })

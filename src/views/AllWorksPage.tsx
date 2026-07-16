@@ -2,11 +2,13 @@
 
 import dynamic from 'next/dynamic'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import ProductCard from '../components/ProductCard'
 import type { ImageSearchResult } from '../components/ImageSearch'
 import { categoryLabels, type Category } from '../data/content'
 import { IMAGE_SEARCH_FILTERS, productMatchesFilter } from '../data/imageSearchFilters'
 import { findSimilarProducts } from '../utils/imageSearch'
+import { searchProductsByText } from '../utils/productTextSearch'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 
@@ -30,10 +32,27 @@ const categories: (Category | 'all')[] = [
 export default function AllWorksPage() {
   const { lang, t } = useApp()
   const { siteData } = useSiteData()
-  const [search, setSearch] = useState('')
+  const searchParams = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [imageSearch, setImageSearch] = useState<ImageSearchResult | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+
+  const textHits = useMemo(() => {
+    const base =
+      category === 'all'
+        ? siteData.products
+        : siteData.products.filter((p) => p.category === category)
+    return searchProductsByText(base, search, lang)
+  }, [siteData.products, category, search, lang])
+
+  const textScoresById = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const hit of textHits) {
+      if (hit.score > 0) map.set(hit.product.id, hit.score)
+    }
+    return map
+  }, [textHits])
 
   const scoresById = useMemo(() => {
     const map = new Map<string, number>()
@@ -43,7 +62,8 @@ export default function AllWorksPage() {
       map.set(m.id, m.score)
     }
 
-    if (imageSearch.colors.length) {
+    const hasStrongVisual = [...map.values()].some((s) => s >= 90)
+    if (imageSearch.colors.length && !hasStrongVisual) {
       for (const item of findSimilarProducts(imageSearch.colors, siteData.products, 50)) {
         if (!map.has(item.product.id)) map.set(item.product.id, item.score)
       }
@@ -53,29 +73,17 @@ export default function AllWorksPage() {
   }, [imageSearch, siteData.products])
 
   const filtered = useMemo(() => {
-    let result = siteData.products
+    let result = search.trim()
+      ? textHits.map((h) => h.product)
+      : category === 'all'
+        ? siteData.products
+        : siteData.products.filter((p) => p.category === category)
+
     const analysisTags = [
       ...(imageSearch?.analysis?.tags ?? []),
       ...(imageSearch?.analysis?.materials ?? []),
       ...(imageSearch?.analysis?.techniques ?? []),
     ]
-
-    if (category !== 'all') {
-      result = result.filter((p) => p.category === category)
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (p) =>
-          p.title.ar.includes(q) ||
-          p.title.en.toLowerCase().includes(q) ||
-          p.description.ar.includes(q) ||
-          p.description.en.toLowerCase().includes(q) ||
-          p.materials.ar.includes(q) ||
-          p.materials.en.toLowerCase().includes(q)
-      )
-    }
 
     if (imageSearch) {
       if (imageSearch.productIds.length > 0) {
@@ -110,7 +118,7 @@ export default function AllWorksPage() {
     }
 
     return result
-  }, [siteData.products, category, search, imageSearch, tagFilter, scoresById])
+  }, [siteData.products, category, search, imageSearch, tagFilter, scoresById, textHits])
 
   return (
     <div className="section-padding">
@@ -234,7 +242,13 @@ export default function AllWorksPage() {
               <ProductCard
                 key={product.id}
                 product={product}
-                similarityScore={imageSearch ? scoresById.get(product.id) : undefined}
+                similarityScore={
+                  imageSearch
+                    ? scoresById.get(product.id)
+                    : search.trim()
+                      ? textScoresById.get(product.id)
+                      : undefined
+                }
               />
             ))}
           </div>

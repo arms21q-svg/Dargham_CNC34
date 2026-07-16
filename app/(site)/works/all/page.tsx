@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import AllWorksPage from '@/views/AllWorksPage'
 import JsonLd from '@/components/seo/JsonLd'
 import { breadcrumbSchema, buildPageMetadata } from '@/lib/seo'
@@ -20,7 +21,15 @@ export default function Page() {
           { name: 'كل الأعمال', path: '/works/all' },
         ])}
       />
-      <AllWorksPage />
+      <Suspense
+        fallback={
+          <div className="section-padding">
+            <div className="container-main py-16 text-center text-gray-500">…</div>
+          </div>
+        }
+      >
+        <AllWorksPage />
+      </Suspense>
     </>
   )
 }

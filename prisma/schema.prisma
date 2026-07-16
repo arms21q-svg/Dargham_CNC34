@@ -65,6 +65,11 @@ model Product {
   featured      Boolean  @default(false)
   colors        String[]
   sortOrder     Int      @default(0)
+  /** 64-bit average-hash hex for near-exact visual match */
+  imageHash     String?
+  /** Compact RGB vector (12x12x3) for cosine visual similarity */
+  imageVector   Json?
+  indexedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -72,6 +77,7 @@ model Product {
   @@index([category, sortOrder])
   @@index([sortOrder])
   @@index([updatedAt])
+  @@index([imageHash])
 }
 
 model Manager {

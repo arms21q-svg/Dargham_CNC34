@@ -6,8 +6,6 @@ import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 import { apiUrl } from '../utils/apiBase'
 import { prepareImageFile } from '../utils/imageAi'
-import { extractColorsFromDataUrl, findSimilarProducts } from '../utils/imageSearch'
-import { localAiReply } from '../utils/localAi'
 import { getWhatsAppUrl } from '../utils/siteDataStorage'
 
 interface ChatMessage {
@@ -28,24 +26,10 @@ const QUICK_QUESTIONS = {
   en: ['What works do you offer?', 'What are the prices?', 'How to order custom?', 'Where are you?'],
 }
 
-function localImageReply(
-  lang: 'ar' | 'en',
-  siteData: ReturnType<typeof useSiteData>['siteData'],
-  colors: string[]
-) {
-  const similar = findSimilarProducts(colors, siteData.products, 3)
-  const whatsapp = siteData.contact.whatsapp
-
-  if (similar.length > 0) {
-    const titles = similar.map((item) => `• ${item.product.title[lang]}`).join('\n')
-    return lang === 'ar'
-      ? `حلّلت الصورة محلياً. أقرب أعمالنا:\n${titles}\n\nلتنفيذ تصميم مشابه، تواصل عبر واتساب: ${whatsapp}`
-      : `I analyzed the image locally. Closest works:\n${titles}\n\nFor a similar custom design, contact us on WhatsApp: ${whatsapp}`
-  }
-
+function unavailableMsg(lang: 'ar' | 'en') {
   return lang === 'ar'
-    ? `تم استلام الصورة. يمكننا تنفيذ تصاميم خشبية مشابهة بدقة CNC. للسعر الدقيق تواصل عبر واتساب: ${whatsapp}`
-    : `Image received. We can produce similar CNC wood designs. For exact pricing contact us on WhatsApp: ${whatsapp}`
+    ? 'خدمة الذكاء الاصطناعي غير متاحة مؤقتًا، يرجى المحاولة لاحقًا.'
+    : 'The AI service is temporarily unavailable. Please try again later.'
 }
 
 async function readSseChat(
@@ -170,20 +154,6 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
       .slice(-HISTORY_LIMIT)
       .map((m) => ({ role: m.role, content: m.content }))
 
-    const fallback = image
-      ? localImageReply(lang, siteData, [])
-      : localAiReply(trimmed, lang, siteData)
-
-    const resolveFallback = async () => {
-      if (!image?.preview) return fallback
-      try {
-        const colors = await extractColorsFromDataUrl(image.preview)
-        return localImageReply(lang, siteData, colors)
-      } catch {
-        return fallback
-      }
-    }
-
     const appendAssistant = (content: string) => {
       setMessages((prev) => [...prev, { role: 'assistant', content }])
     }
@@ -245,17 +215,17 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
         )
 
         if (!assembled.trim()) {
-          updateLastAssistant(await resolveFallback())
+          updateLastAssistant(unavailableMsg(lang))
         }
         return
       }
 
       // JSON fallback (non-stream)
-      let json: { ok?: boolean; reply?: string; error?: string } = {}
+      let json: { ok?: boolean; reply?: string; error?: string; mode?: string } = {}
       try {
         json = (await res.json()) as typeof json
       } catch {
-        appendAssistant(await resolveFallback())
+        appendAssistant(unavailableMsg(lang))
         return
       }
 
@@ -264,7 +234,7 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
         return
       }
 
-      if (json.error && res.status === 403) {
+      if (json.error && (res.status === 403 || res.status === 503 || res.status === 429)) {
         appendAssistant(json.error)
         return
       }
@@ -274,9 +244,9 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
         return
       }
 
-      appendAssistant(await resolveFallback())
+      appendAssistant(unavailableMsg(lang))
     } catch {
-      appendAssistant(await resolveFallback())
+      appendAssistant(unavailableMsg(lang))
     } finally {
       setLoading(false)
       setStreaming(false)

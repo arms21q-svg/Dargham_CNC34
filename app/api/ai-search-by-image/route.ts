@@ -56,12 +56,12 @@ async function visionFallback(
   let mode = 'local'
 
   if (geminiKey) {
-    const reply = await callGemini(geminiKey, searchPrompt, [], [
+    const result = await callGemini(geminiKey, searchPrompt, [], [
       { inlineData: { mimeType, data: imageBase64 } },
       { text: replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?' },
     ])
-    if (reply) {
-      productIds = extractProductIds(reply, validIds)
+    if (result.ok && result.text) {
+      productIds = extractProductIds(result.text, validIds)
       mode = 'gemini-vision'
     }
   }

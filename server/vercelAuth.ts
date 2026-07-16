@@ -1,14 +1,25 @@
 import jwt from 'jsonwebtoken'
 
+let jwtWarned = false
+
+function isProd() {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+}
+
+/** True when JWT_SECRET is present and strong enough for production admin auth. */
+export function isJwtConfigured(): boolean {
+  const fromEnv = process.env.JWT_SECRET?.trim()
+  return Boolean(fromEnv && fromEnv !== 'dev-secret-change-me' && fromEnv.length >= 24)
+}
+
 function resolveJwtSecret(): string {
   const fromEnv = process.env.JWT_SECRET?.trim()
-  const isProd =
-    process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
 
-  if (isProd) {
-    if (!fromEnv || fromEnv === 'dev-secret-change-me' || fromEnv.length < 24) {
-      console.error('[security] JWT_SECRET missing or too weak for production')
-    }
+  if (isProd() && !isJwtConfigured() && !jwtWarned) {
+    jwtWarned = true
+    console.warn(
+      '[security] JWT_SECRET missing or too weak — admin login API will reject until a strong JWT_SECRET is set. Public site remains available.'
+    )
   }
 
   return fromEnv || 'dev-secret-change-me'
@@ -27,6 +38,7 @@ export function getJwtSecret() {
 }
 
 export function verifyBearerHeader(authorization: string | null | undefined): AuthPayload | null {
+  if (!isJwtConfigured() && isProd()) return null
   if (!authorization?.startsWith('Bearer ')) return null
   try {
     const payload = jwt.verify(authorization.slice(7), JWT_SECRET) as {

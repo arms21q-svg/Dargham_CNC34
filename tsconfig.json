@@ -47,6 +47,7 @@
     "server/aiCore.ts",
     "server/vectorSearch.ts",
     "server/rateLimit.ts",
+    "server/geminiClient.ts",
     "server/vercelAuth.ts",
     "server/utils/adminUsers.ts",
     "server/loadEnv.ts",

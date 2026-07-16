@@ -1,4 +1,13 @@
 import { prisma } from './db'
+import {
+  geminiGenerateContent,
+  geminiStreamContent,
+  getGeminiApiKey,
+  getGeminiModels,
+  logEnvHealth,
+  serviceUnavailableMessage,
+  type GeminiResult,
+} from './geminiClient'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -12,9 +21,22 @@ export interface ImagePayload {
 
 export const HISTORY_LIMIT = 10
 const CONTEXT_CACHE_TTL_MS = 60_000
-const MAX_HISTORY_CHARS = 400
-const MAX_PRODUCTS_IN_PROMPT = 8
-const MAX_DESC_CHARS = 60
+const MAX_HISTORY_CHARS = 500
+const MAX_PRODUCTS_IN_PROMPT = 16
+const MAX_DESC_CHARS = 90
+const ANSWER_CACHE_TTL_MS = 5 * 60_000
+const ANSWER_CACHE_MAX = 80
+
+type AnswerCacheEntry = { at: number; reply: string; mode: string }
+const answerCache = new Map<string, AnswerCacheEntry>()
+const inflightChat = new Map<string, Promise<{ status: number; body: Record<string, unknown> }>>()
+
+let envLogged = false
+function ensureEnvLogged() {
+  if (envLogged) return
+  envLogged = true
+  logEnvHealth()
+}
 
 type CachedRuntime = {
   at: number
@@ -46,9 +68,30 @@ export function trimHistory(history: ChatMessage[] = [], limit = HISTORY_LIMIT):
     }))
 }
 
-function preferredGeminiModels(): string[] {
-  const preferred = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
-  return Array.from(new Set([preferred, 'gemini-2.0-flash']))
+function answerCacheKey(lang: string, message: string, hasImage: boolean) {
+  return `${lang}:${hasImage ? '1' : '0'}:${message.trim().toLowerCase().slice(0, 240)}`
+}
+
+function getCachedAnswer(key: string): AnswerCacheEntry | null {
+  const hit = answerCache.get(key)
+  if (!hit) return null
+  if (Date.now() - hit.at > ANSWER_CACHE_TTL_MS) {
+    answerCache.delete(key)
+    return null
+  }
+  return hit
+}
+
+function setCachedAnswer(key: string, reply: string, mode: string) {
+  if (answerCache.size >= ANSWER_CACHE_MAX) {
+    const oldest = answerCache.keys().next().value
+    if (oldest) answerCache.delete(oldest)
+  }
+  answerCache.set(key, { at: Date.now(), reply, mode })
+}
+
+function isUnavailableKind(kind?: string) {
+  return kind === 'quota' || kind === 'timeout' || kind === 'auth' || kind === 'server' || kind === 'network'
 }
 
 /** Compact catalog + contact — one DB round-trip, cached briefly. */
@@ -171,13 +214,40 @@ export async function buildSiteContext(lang: 'ar' | 'en') {
 
 export function buildSystemPrompt(lang: 'ar' | 'en', siteContext: string, withImage = false) {
   if (lang === 'ar') {
-    return `مساعد ضرغام CNC. أجب عربي باختصار (2–5 جمل). اعتمد على الموقع فقط. أسعار/طلب → واتساب. ${
-      withImage ? 'الصورة: صف التصميم واقترح عملاً مشابهاً إن وُجد. ' : ''
-    }ودود ومحترف.\n${siteContext}`
+    return [
+      'أنت المساعد الرسمي لموقع ورشة «ضرغام CNC» في العراق.',
+      'أجب بالعربية الفصحى الواضحة، بأسلوب ودود ومحترف، في 2–6 جمل.',
+      'اعتمد فقط على بيانات الموقع والكتالوج أدناه. لا تختلق أسعاراً أو مواعيد غير موجودة.',
+      'للأسعار والطلبات والقياسات المخصصة: وجّه العميل إلى واتساب المذكور.',
+      'إن وُجدت أعمال مشابهة في الكتالوج فاذكر أسماءها باختصار.',
+      withImage
+        ? 'إذا أُرفقت صورة: صف نوع التصميم والخامة المحتملة واقترح أقرب عمل من الكتالوج إن أمكن.'
+        : '',
+      'لا تذكر أنك نموذج لغوي إلا إذا سُئلت مباشرة.',
+      '',
+      'بيانات الموقع:',
+      siteContext,
+    ]
+      .filter(Boolean)
+      .join('\n')
   }
-  return `Dorgham CNC assistant. Reply briefly in English (2–5 sentences). Use site info only. Pricing/orders → WhatsApp. ${
-    withImage ? 'If image: describe design and suggest a similar work if any. ' : ''
-  }Friendly & professional.\n${siteContext}`
+
+  return [
+    'You are the official assistant for Dorgham CNC workshop in Iraq.',
+    'Reply in clear English, friendly and professional, in 2–6 sentences.',
+    'Use ONLY the site catalog/context below. Do not invent prices or lead times.',
+    'For pricing, orders, and custom sizing: direct the customer to the WhatsApp number provided.',
+    'If similar catalog works exist, mention their titles briefly.',
+    withImage
+      ? 'If an image is attached: describe the design/material and suggest the closest catalog work when possible.'
+      : '',
+    'Do not mention being an AI model unless asked.',
+    '',
+    'Site data:',
+    siteContext,
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 export function localReply(
@@ -259,70 +329,21 @@ function geminiBody(systemPrompt: string, contents: unknown) {
   }
 }
 
-/** Stream Gemini tokens (SSE). Yields text deltas. */
+/** Stream Gemini tokens (SSE). Yields text deltas; returns final GeminiResult. */
 export async function* streamGemini(
   apiKey: string,
   systemPrompt: string,
   history: ChatMessage[],
   userParts: { text?: string; inlineData?: { mimeType: string; data: string } }[]
-): AsyncGenerator<string, void, unknown> {
+): AsyncGenerator<string, GeminiResult, unknown> {
+  ensureEnvLogged()
   const contents = buildGeminiContents(history, userParts)
-  const body = JSON.stringify(geminiBody(systemPrompt, contents))
-
-  for (const model of preferredGeminiModels()) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      })
-
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '')
-        console.error(`Gemini stream error (${model}):`, errText.slice(0, 300))
-        continue
-      }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let yielded = false
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-
-        const chunks = buffer.split('\n')
-        buffer = chunks.pop() ?? ''
-
-        for (const line of chunks) {
-          const trimmed = line.trim()
-          if (!trimmed.startsWith('data:')) continue
-          const payload = trimmed.slice(5).trim()
-          if (!payload || payload === '[DONE]') continue
-
-          try {
-            const json = JSON.parse(payload) as {
-              candidates?: { content?: { parts?: { text?: string }[] } }[]
-            }
-            const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
-            if (text) {
-              yielded = true
-              yield text
-            }
-          } catch {
-            // ignore partial JSON lines
-          }
-        }
-      }
-
-      if (yielded) return
-    } catch (err) {
-      console.error(`Gemini stream failed (${model}):`, err instanceof Error ? err.message : err)
-    }
-  }
+  const body = geminiBody(systemPrompt, contents)
+  return yield* geminiStreamContent({
+    apiKey,
+    body,
+    models: getGeminiModels(),
+  })
 }
 
 export async function callGemini(
@@ -330,35 +351,14 @@ export async function callGemini(
   systemPrompt: string,
   history: ChatMessage[],
   userParts: { text?: string; inlineData?: { mimeType: string; data: string } }[]
-): Promise<string | null> {
+): Promise<GeminiResult> {
+  ensureEnvLogged()
   const contents = buildGeminiContents(history, userParts)
-  const body = JSON.stringify(geminiBody(systemPrompt, contents))
-
-  for (const model of preferredGeminiModels()) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      })
-
-      if (!res.ok) {
-        console.error(`Gemini error (${model}):`, (await res.text()).slice(0, 300))
-        continue
-      }
-
-      const data = (await res.json()) as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[]
-      }
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-      if (text) return text
-    } catch (err) {
-      console.error(`Gemini fetch failed (${model}):`, err instanceof Error ? err.message : err)
-    }
-  }
-
-  return null
+  return geminiGenerateContent({
+    apiKey,
+    body: geminiBody(systemPrompt, contents),
+    models: getGeminiModels(),
+  })
 }
 
 export async function callGeminiText(
@@ -366,7 +366,7 @@ export async function callGeminiText(
   systemPrompt: string,
   history: ChatMessage[],
   message: string
-): Promise<string | null> {
+): Promise<GeminiResult> {
   return callGemini(apiKey, systemPrompt, history, [{ text: message.trim() }])
 }
 
@@ -488,6 +488,7 @@ export async function handleAiChat(input: {
   imageBase64?: string
   mimeType?: string
 }): Promise<{ status: number; body: Record<string, unknown> }> {
+  ensureEnvLogged()
   const { message = '', lang = 'ar', history = [], imageBase64, mimeType } = input
   const replyLang = lang === 'en' ? 'en' : 'ar'
   const image = parseImagePayload({ imageBase64, mimeType })
@@ -498,94 +499,146 @@ export async function handleAiChat(input: {
     return { status: 400, body: { ok: false, error: 'الرسالة أو الصورة مطلوبة' } }
   }
 
-  try {
-    const runtime = await getAiRuntime(replyLang)
-    if (!runtime.ok) {
-      return { status: 403, body: { ok: false, error: runtime.error } }
+  const cacheKey = answerCacheKey(replyLang, trimmed || '[image]', Boolean(image))
+  if (!image) {
+    const cached = getCachedAnswer(cacheKey)
+    if (cached) {
+      return {
+        status: 200,
+        body: { ok: true, reply: cached.reply, mode: cached.mode, cached: true },
+      }
     }
+  }
 
-    const geminiKey = process.env.GEMINI_API_KEY
-    const openAiKey = process.env.OPENAI_API_KEY
-    const { context, titles, whatsapp } = runtime
-    const userText =
-      trimmed ||
-      (replyLang === 'ar'
-        ? 'حلّل هذه الصورة واقترح ما يمكننا تنفيذه.'
-        : 'Analyze this image and suggest what we can make.')
+  const existing = inflightChat.get(cacheKey)
+  if (existing && !image) return existing
 
-    if (image) {
-      const systemPrompt = buildSystemPrompt(replyLang, context, true)
+  const run = (async (): Promise<{ status: number; body: Record<string, unknown> }> => {
+    try {
+      const runtime = await getAiRuntime(replyLang)
+      if (!runtime.ok) {
+        return { status: 403, body: { ok: false, error: runtime.error } }
+      }
+
+      const geminiKey = getGeminiApiKey()
+      const openAiKey = process.env.OPENAI_API_KEY
+      const { context, whatsapp } = runtime
+      const userText =
+        trimmed ||
+        (replyLang === 'ar'
+          ? 'حلّل هذه الصورة واقترح ما يمكننا تنفيذه.'
+          : 'Analyze this image and suggest what we can make.')
+
+      const unavailable = serviceUnavailableMessage(replyLang)
+      const systemPrompt = buildSystemPrompt(replyLang, context, Boolean(image))
+
+      if (image) {
+        let lastKind: string | undefined
+
+        if (geminiKey) {
+          const result = await callGemini(geminiKey, systemPrompt, recent, [
+            { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
+            { text: userText },
+          ])
+          if (result.ok && result.text) {
+            return { status: 200, body: { ok: true, reply: result.text, mode: 'gemini-vision' } }
+          }
+          lastKind = result.kind
+        }
+
+        if (openAiKey) {
+          const reply = await callOpenAiVision(
+            openAiKey,
+            systemPrompt,
+            userText,
+            image.imageBase64,
+            image.mimeType
+          )
+          if (reply) return { status: 200, body: { ok: true, reply, mode: 'openai-vision' } }
+        }
+
+        if (isUnavailableKind(lastKind) || geminiKey || openAiKey) {
+          return {
+            status: 200,
+            body: {
+              ok: true,
+              reply: unavailable,
+              mode: 'unavailable',
+              errorKind: lastKind || 'unknown',
+            },
+          }
+        }
+
+        return {
+          status: 200,
+          body: { ok: true, reply: localImageAnalysis(replyLang, whatsapp), mode: 'local-image' },
+        }
+      }
+
+      if (!geminiKey && !openAiKey) {
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            reply: unavailable,
+            mode: 'unavailable',
+            missingKey: true,
+            errorKind: 'invalid_key',
+          },
+        }
+      }
+
+      let reply: string | null = null
+      let mode = 'unavailable'
+      let lastKind: string | undefined
 
       if (geminiKey) {
-        const reply = await callGemini(geminiKey, systemPrompt, recent, [
-          { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
-          { text: userText },
-        ])
-        if (reply) return { status: 200, body: { ok: true, reply, mode: 'gemini-vision' } }
+        const result = await callGeminiText(geminiKey, systemPrompt, recent, trimmed)
+        if (result.ok && result.text) {
+          reply = result.text
+          mode = 'gemini'
+        } else {
+          lastKind = result.kind
+        }
       }
 
-      if (openAiKey) {
-        const reply = await callOpenAiVision(
-          openAiKey,
-          systemPrompt,
-          userText,
-          image.imageBase64,
-          image.mimeType
-        )
-        if (reply) return { status: 200, body: { ok: true, reply, mode: 'openai-vision' } }
+      if (!reply && openAiKey) {
+        reply = await callOpenAi(openAiKey, systemPrompt, recent, trimmed)
+        if (reply) mode = 'openai'
       }
 
+      if (!reply) {
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            reply: unavailable,
+            mode: 'unavailable',
+            errorKind: lastKind || 'unknown',
+          },
+        }
+      }
+
+      setCachedAnswer(cacheKey, reply, mode)
+      return { status: 200, body: { ok: true, reply, mode } }
+    } catch (error) {
+      console.error('[ai] chat error', error instanceof Error ? error.message : error)
       return {
         status: 200,
         body: {
           ok: true,
-          reply: localImageAnalysis(replyLang, whatsapp),
-          mode: 'local-image',
+          reply: serviceUnavailableMessage(replyLang),
+          mode: 'unavailable',
+          errorKind: 'unknown',
         },
       }
+    } finally {
+      inflightChat.delete(cacheKey)
     }
+  })()
 
-    const fallback = localReply(trimmed, replyLang, whatsapp, titles)
-
-    if (!geminiKey && !openAiKey) {
-      return { status: 200, body: { ok: true, reply: fallback, mode: 'local', missingKey: true } }
-    }
-
-    const systemPrompt = buildSystemPrompt(replyLang, context)
-    let reply: string | null = null
-    let mode = 'local'
-
-    if (geminiKey) {
-      reply = await callGeminiText(geminiKey, systemPrompt, recent, trimmed)
-      if (reply) mode = 'gemini'
-    }
-
-    if (!reply && openAiKey) {
-      reply = await callOpenAi(openAiKey, systemPrompt, recent, trimmed)
-      if (reply) mode = 'openai'
-    }
-
-    return {
-      status: 200,
-      body: {
-        ok: true,
-        reply: reply || fallback,
-        mode: reply ? mode : geminiKey || openAiKey ? 'local-after-ai-fail' : 'local',
-      },
-    }
-  } catch (error) {
-    console.error('AI chat error:', error)
-    return {
-      status: 200,
-      body: {
-        ok: true,
-        reply: image
-          ? localImageAnalysis(replyLang, '9647701234567')
-          : localReply(trimmed, replyLang, '9647701234567'),
-        mode: 'local',
-      },
-    }
-  }
+  if (!image) inflightChat.set(cacheKey, run)
+  return run
 }
 
 /** Prepare streaming chat — returns SSE meta + async text source. */
@@ -601,9 +654,12 @@ export async function prepareAiChatStream(input: {
       ok: true
       mode: string
       fallback: string
-      stream: AsyncGenerator<string, void, unknown> | null
+      unavailableFallback: boolean
+      cachedReply?: string
+      stream: AsyncGenerator<string, GeminiResult, unknown> | null
     }
 > {
+  ensureEnvLogged()
   const { message = '', lang = 'ar', history = [], imageBase64, mimeType } = input
   const replyLang = lang === 'en' ? 'en' : 'ar'
   const image = parseImagePayload({ imageBase64, mimeType })
@@ -619,8 +675,8 @@ export async function prepareAiChatStream(input: {
     return { ok: false, status: 403, error: runtime.error }
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY
-  const { context, titles, whatsapp } = runtime
+  const geminiKey = getGeminiApiKey()
+  const { context } = runtime
   const userText =
     trimmed ||
     (replyLang === 'ar'
@@ -629,25 +685,45 @@ export async function prepareAiChatStream(input: {
 
   const withImage = Boolean(image)
   const systemPrompt = buildSystemPrompt(replyLang, context, withImage)
-  const fallback = withImage
-    ? localImageAnalysis(replyLang, whatsapp)
-    : localReply(trimmed, replyLang, whatsapp, titles)
+  const unavailable = serviceUnavailableMessage(replyLang)
 
-  if (!geminiKey) {
-    return { ok: true, mode: 'local', fallback, stream: null }
+  if (!withImage) {
+    const cached = getCachedAnswer(answerCacheKey(replyLang, trimmed, false))
+    if (cached) {
+      return {
+        ok: true,
+        mode: cached.mode,
+        fallback: cached.reply,
+        unavailableFallback: cached.mode === 'unavailable',
+        cachedReply: cached.reply,
+        stream: null,
+      }
+    }
   }
 
-  const userParts = withImage && image
-    ? [
-        { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
-        { text: userText },
-      ]
-    : [{ text: trimmed }]
+  if (!geminiKey) {
+    return {
+      ok: true,
+      mode: 'unavailable',
+      fallback: unavailable,
+      unavailableFallback: true,
+      stream: null,
+    }
+  }
+
+  const userParts =
+    withImage && image
+      ? [
+          { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
+          { text: userText },
+        ]
+      : [{ text: trimmed }]
 
   return {
     ok: true,
     mode: withImage ? 'gemini-vision' : 'gemini',
-    fallback,
+    fallback: unavailable,
+    unavailableFallback: true,
     stream: streamGemini(geminiKey, systemPrompt, recent, userParts),
   }
 }

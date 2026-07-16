@@ -4,9 +4,9 @@ import {
   callGemini,
   callOpenAiVision,
   getAiRuntime,
-  localImageAnalysis,
   parseImagePayload,
 } from '@server/aiCore'
+import { getGeminiApiKey, serviceUnavailableMessage } from '@server/geminiClient'
 import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 
 export const maxDuration = 60
@@ -42,17 +42,17 @@ export async function POST(req: NextRequest) {
         : 'Analyze image for CNC: type, colors, material, feasibility.')
 
     const systemPrompt = buildSystemPrompt(replyLang, runtime.context, true)
-    const geminiKey = process.env.GEMINI_API_KEY
+    const geminiKey = getGeminiApiKey()
     const openAiKey = process.env.OPENAI_API_KEY
+    const unavailable = serviceUnavailableMessage(replyLang)
 
-    // Prefer Gemini; OpenAI only if Gemini missing/fails — no sequential model spam beyond one retry
     if (geminiKey) {
-      const reply = await callGemini(geminiKey, systemPrompt, [], [
+      const result = await callGemini(geminiKey, systemPrompt, [], [
         { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
         { text: prompt },
       ])
-      if (reply) {
-        return NextResponse.json({ ok: true, reply, mode: 'gemini-vision' })
+      if (result.ok && result.text) {
+        return NextResponse.json({ ok: true, reply: result.text, mode: 'gemini-vision' })
       }
     }
 
@@ -71,15 +71,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      reply: localImageAnalysis(replyLang, runtime.whatsapp),
-      mode: 'local-image',
+      reply: unavailable,
+      mode: 'unavailable',
     })
   } catch (error) {
-    console.error('ai-analyze-image', error)
+    console.error('[ai] analyze-image', error instanceof Error ? error.message : error)
     return NextResponse.json({
       ok: true,
-      reply: localImageAnalysis('ar', '9647701234567'),
-      mode: 'local-image',
+      reply: serviceUnavailableMessage('ar'),
+      mode: 'unavailable',
     })
   }
 }

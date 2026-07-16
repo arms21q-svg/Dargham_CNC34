@@ -69,12 +69,12 @@ router.post('/analyze-image', async (req, res) => {
     const openAiKey = process.env.OPENAI_API_KEY
 
     if (geminiKey) {
-      const reply = await callGemini(geminiKey, systemPrompt, [], [
+      const result = await callGemini(geminiKey, systemPrompt, [], [
         { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
         { text: prompt },
       ])
-      if (reply) {
-        res.json({ ok: true, reply, mode: 'gemini-vision' })
+      if (result.ok && result.text) {
+        res.json({ ok: true, reply: result.text, mode: 'gemini-vision' })
         return
       }
     }
@@ -179,12 +179,12 @@ router.post('/search-by-image', async (req, res) => {
       let productIds: string[] = []
 
       if (geminiKey) {
-        const reply = await callGemini(geminiKey, searchPrompt, [], [
+        const result = await callGemini(geminiKey, searchPrompt, [], [
           { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
           { text: replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?' },
         ])
-        if (reply) {
-          productIds = extractProductIds(reply, validIds)
+        if (result.ok && result.text) {
+          productIds = extractProductIds(result.text, validIds)
           mode = 'gemini-vision'
         }
       }

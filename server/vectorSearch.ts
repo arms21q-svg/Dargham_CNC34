@@ -227,11 +227,12 @@ export async function analyzeImageStructured(
       : `Analyze this CNC/décor work image. Return JSON only:
 {"workType":"...","materials":[],"design":"...","techniques":[],"summary":"short search summary","tags":["mdf","acrylic","metal","carve","laser","engraving","facade","decor"]}`
 
-  const reply = await callGemini(apiKey, 'You extract structured CNC work metadata as JSON only.', [], [
+  const result = await callGemini(apiKey, 'You extract structured CNC work metadata as JSON only.', [], [
     { inlineData: { mimeType, data: imageBase64 } },
     { text: prompt },
   ])
 
+  const reply = result.text
   if (!reply) return null
   const parsed = parseAnalysisJson(reply)
   if (parsed && (parsed.summary || parsed.workType || parsed.design)) return parsed

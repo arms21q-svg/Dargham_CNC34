@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
-import { getJwtSecret } from '@server/vercelAuth'
+import { getJwtSecret, isJwtConfigured } from '@server/vercelAuth'
 
 export const maxDuration = 30
 export const runtime = 'nodejs'
@@ -10,6 +10,19 @@ export async function POST(req: NextRequest) {
   try {
     const limited = rateLimit(`login:${clientIp(req)}`, 8, 60_000)
     if (!limited.ok) return rateLimitResponse(limited.retryAfter)
+
+    const isProd =
+      process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+    if (isProd && !isJwtConfigured()) {
+      console.warn('[auth] login blocked: JWT_SECRET not configured')
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'إعدادات الأمان غير مكتملة على السيرفر (JWT_SECRET). تواصل مع المطوّر.',
+        },
+        { status: 503 }
+      )
+    }
 
     const bcrypt = (await import('bcryptjs')).default
     const jwt = (await import('jsonwebtoken')).default

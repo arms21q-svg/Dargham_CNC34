@@ -1,6 +1,20 @@
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
+function resolveJwtSecret(): string {
+  const fromEnv = process.env.JWT_SECRET?.trim()
+  const isProd =
+    process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
+
+  if (isProd) {
+    if (!fromEnv || fromEnv === 'dev-secret-change-me' || fromEnv.length < 24) {
+      console.error('[security] JWT_SECRET missing or too weak for production')
+    }
+  }
+
+  return fromEnv || 'dev-secret-change-me'
+}
+
+const JWT_SECRET = resolveJwtSecret()
 
 export interface AuthPayload {
   email: string

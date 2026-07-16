@@ -49,10 +49,13 @@ function PageTransition({ children }: { children: ReactNode }) {
 export default function PublicShell({ children }: { children: ReactNode }) {
   return (
     <>
+      <a href="#main-content" className="skip-link">
+        تخطي إلى المحتوى
+      </a>
       <BrandSplash skip={false} />
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main className="flex-1">
+        <main id="main-content" className="flex-1" tabIndex={-1}>
           <PageTransition>{children}</PageTransition>
         </main>
         <Footer />

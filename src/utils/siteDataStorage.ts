@@ -30,10 +30,26 @@ export function getAuthToken(): string | null {
   return sessionStorage.getItem(AUTH_TOKEN_KEY)
 }
 
+export const ADMIN_SESSION_COOKIE = 'dorgham_admin_session'
+
+export function setAdminSessionCookie(active: boolean) {
+  if (typeof document === 'undefined') return
+  if (active) {
+    document.cookie = `${ADMIN_SESSION_COOKIE}=1; Path=/; Max-Age=${7 * 24 * 3600}; SameSite=Lax`
+  } else {
+    document.cookie = `${ADMIN_SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
+  }
+}
+
 export function setAuthToken(token: string | null) {
   if (typeof window === 'undefined') return
-  if (token) sessionStorage.setItem(AUTH_TOKEN_KEY, token)
-  else sessionStorage.removeItem(AUTH_TOKEN_KEY)
+  if (token) {
+    sessionStorage.setItem(AUTH_TOKEN_KEY, token)
+    setAdminSessionCookie(true)
+  } else {
+    sessionStorage.removeItem(AUTH_TOKEN_KEY)
+    setAdminSessionCookie(false)
+  }
 }
 
 export function mergeSiteData(base: SiteData, patch: Partial<SiteData>): SiteData {

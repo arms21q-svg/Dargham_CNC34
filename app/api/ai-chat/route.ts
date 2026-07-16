@@ -4,6 +4,7 @@ import {
   prepareAiChatStream,
   type ChatMessage,
 } from '@server/aiCore'
+import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -14,6 +15,9 @@ function sseEncode(obj: Record<string, unknown>) {
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(`ai-chat:${clientIp(req)}`, 30, 60_000)
+    if (!limited.ok) return rateLimitResponse(limited.retryAfter)
+
     const body = (await req.json().catch(() => ({}))) as {
       message?: string
       lang?: string

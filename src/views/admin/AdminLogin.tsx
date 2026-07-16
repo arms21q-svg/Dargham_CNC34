@@ -1,23 +1,30 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
 import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD } from '../../data/defaultSiteData'
 
 export default function AdminLogin() {
   const { isAdmin, login, loading } = useSiteData()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  const nextPath = (() => {
+    const next = searchParams.get('next')
+    if (next && next.startsWith('/admin') && !next.startsWith('//')) return next
+    return '/admin'
+  })()
+
   useEffect(() => {
     if (!loading && isAdmin) {
-      router.replace('/admin')
+      router.replace(nextPath)
     }
-  }, [loading, isAdmin, router])
+  }, [loading, isAdmin, router, nextPath])
 
   if (!loading && isAdmin) {
     return null
@@ -37,7 +44,7 @@ export default function AdminLogin() {
     setSubmitting(false)
 
     if (result.ok) {
-      router.push('/admin')
+      router.push(nextPath)
     } else {
       setError(result.error ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة')
     }

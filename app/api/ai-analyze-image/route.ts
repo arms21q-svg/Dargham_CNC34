@@ -7,12 +7,16 @@ import {
   localImageAnalysis,
   parseImagePayload,
 } from '@server/aiCore'
+import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(`ai-analyze:${clientIp(req)}`, 20, 60_000)
+    if (!limited.ok) return rateLimitResponse(limited.retryAfter)
+
     const body = (await req.json().catch(() => ({}))) as {
       lang?: string
       message?: string

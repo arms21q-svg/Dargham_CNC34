@@ -24,6 +24,7 @@ import {
   loginWithApi,
   publishSiteData,
   saveSiteDataLocal,
+  setAdminSessionCookie,
   setAuthToken,
 } from '../utils/siteDataStorage'
 
@@ -82,9 +83,11 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
     const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
     if (flagged && isVercelHost() && !getAuthToken()) {
       sessionStorage.removeItem(ADMIN_AUTH_KEY)
+      setAdminSessionCookie(false)
       setIsAdmin(false)
     } else {
       setIsAdmin(flagged)
+      if (flagged) setAdminSessionCookie(true)
     }
 
     let cancelled = false
@@ -113,6 +116,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
     const apiResult = await loginWithApi(email, password)
     if (apiResult.ok) {
       sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
+      setAdminSessionCookie(true)
       setIsAdmin(true)
       const fresh = await loadSiteData()
       setSiteData(fresh)
@@ -138,6 +142,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
 
     if (inputEmail === expectedEmail && password === expectedPassword) {
       sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
+      setAdminSessionCookie(true)
       setIsAdmin(true)
       return { ok: true }
     }
@@ -152,6 +157,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     sessionStorage.removeItem(ADMIN_AUTH_KEY)
     setAuthToken(null)
+    setAdminSessionCookie(false)
     setIsAdmin(false)
   }, [])
 

@@ -6,6 +6,7 @@ import {
   getAiRuntime,
   parseImagePayload,
 } from '@server/aiCore'
+import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 import {
   analyzeImageStructured,
   loadCatalogForLocal,
@@ -25,27 +26,24 @@ function analysisToNote(analysis: ImageAnalysis | null, lang: 'ar' | 'en') {
     analysis.materials.slice(0, 3).join(lang === 'ar' ? '، ' : ', '),
     analysis.design,
   ].filter(Boolean)
-  return parts.join(lang === 'ar' ? ' · ' : ' · ') || analysis.summary || undefined
+  return parts.join(' · ') || analysis.summary || undefined
 }
+
+type RuntimeOk = Extract<Awaited<ReturnType<typeof getAiRuntime>>, { ok: true }>
 
 async function visionFallback(
   imageBase64: string,
   mimeType: string,
-  replyLang: 'ar' | 'en'
+  replyLang: 'ar' | 'en',
+  runtime: RuntimeOk,
+  existingAnalysis: ImageAnalysis | null
 ): Promise<{ matches: ScoredMatch[]; analysis: ImageAnalysis | null; mode: string }> {
-  const runtime = await getAiRuntime(replyLang)
-  const analysis = process.env.GEMINI_API_KEY
-    ? await analyzeImageStructured(process.env.GEMINI_API_KEY, imageBase64, mimeType, replyLang)
-    : null
-
-  if (!runtime.ok) {
-    const products = await loadCatalogForLocal()
-    if (analysis) {
-      const matches = localTagRank(analysis, products)
-      return { matches, analysis, mode: 'local-tags' }
-    }
-    return { matches: [], analysis, mode: 'local' }
-  }
+  const geminiKey = process.env.GEMINI_API_KEY
+  const analysis =
+    existingAnalysis ||
+    (geminiKey
+      ? await analyzeImageStructured(geminiKey, imageBase64, mimeType, replyLang)
+      : null)
 
   const validIds = new Set(runtime.productIds)
   const searchPrompt =
@@ -53,7 +51,6 @@ async function visionFallback(
       ? `طابق الصورة مع الكتالوج. أعد JSON array من ids فقط مرتبة من الأكثر تشابهاً.\n${runtime.context}`
       : `Match image to catalog. Return ONLY a JSON array of ids ordered by similarity.\n${runtime.context}`
 
-  const geminiKey = process.env.GEMINI_API_KEY
   const openAiKey = process.env.OPENAI_API_KEY
   let productIds: string[] = []
   let mode = 'local'
@@ -98,6 +95,9 @@ async function visionFallback(
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(`ai-search:${clientIp(req)}`, 15, 60_000)
+    if (!limited.ok) return rateLimitResponse(limited.retryAfter)
+
     const body = (await req.json().catch(() => ({}))) as {
       lang?: string
       imageBase64?: string
@@ -108,6 +108,11 @@ export async function POST(req: NextRequest) {
 
     if (!image) {
       return NextResponse.json({ ok: false, error: 'الصورة مطلوبة' }, { status: 400 })
+    }
+
+    // Cap payload size (~4MB base64)
+    if (image.imageBase64.length > 5_500_000) {
+      return NextResponse.json({ ok: false, error: 'الصورة كبيرة جداً' }, { status: 413 })
     }
 
     const runtime = await getAiRuntime(replyLang)
@@ -133,14 +138,22 @@ export async function POST(req: NextRequest) {
         analysis = embedded.analysis
         softMatch = embedded.softMatch
         mode = embedded.mode
+      } else if (embedded?.analysis) {
+        analysis = embedded.analysis
       }
     }
 
     if (matches.length === 0) {
-      const fallback = await visionFallback(image.imageBase64, image.mimeType, replyLang)
+      const fallback = await visionFallback(
+        image.imageBase64,
+        image.mimeType,
+        replyLang,
+        runtime,
+        analysis
+      )
       matches = fallback.matches
       analysis = fallback.analysis ?? analysis
-      softMatch = matches.length === 0 || (matches[0]?.score ?? 0) < 58
+      softMatch = matches.length === 0 || (matches[0]?.score ?? 0) < 72
       mode = fallback.mode
     }
 

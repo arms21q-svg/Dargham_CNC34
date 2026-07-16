@@ -1,6 +1,13 @@
 import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import Providers from '@/components/Providers'
+import {
+  absoluteUrl,
+  DEFAULT_OG_IMAGE,
+  SITE_NAME_AR,
+  SITE_NAME_EN,
+  SITE_URL,
+} from '@/lib/seo'
 import './globals.css'
 
 import '@fontsource/tajawal/arabic-400.css'
@@ -11,17 +18,15 @@ import '@fontsource/tajawal/latin-700.css'
 import '@fontsource/inter/latin-400.css'
 import '@fontsource/inter/latin-600.css'
 
-const siteUrl = 'https://www.dhirghamcnc.com'
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: 'ضرغام CNC | Dorgham CNC',
-    template: '%s | ضرغام CNC',
+    default: `${SITE_NAME_AR} | ${SITE_NAME_EN}`,
+    template: `%s | ${SITE_NAME_AR}`,
   },
   description:
     'ضرغام CNC — تصاميم خشبية فاخرة بتقنية CNC في العراق. جداريات، أبواب، وديكور مخصص.',
-  applicationName: 'Dorgham CNC',
+  applicationName: SITE_NAME_EN,
   keywords: [
     'ضرغام CNC',
     'Dorgham CNC',
@@ -29,24 +34,43 @@ export const metadata: Metadata = {
     'أعمال خشبية',
     'جداريات',
     'أبواب CNC',
+    'ديكور خشبي',
+    'CNC بغداد',
   ],
-  authors: [{ name: 'Dorgham CNC' }],
-  creator: 'Dorgham CNC',
+  authors: [{ name: SITE_NAME_AR }],
+  creator: SITE_NAME_AR,
+  alternates: {
+    canonical: SITE_URL,
+    languages: {
+      'ar-IQ': SITE_URL,
+      en: SITE_URL,
+      'x-default': SITE_URL,
+    },
+  },
   openGraph: {
     type: 'website',
     locale: 'ar_IQ',
     alternateLocale: ['en_US'],
-    url: siteUrl,
-    siteName: 'ضرغام CNC',
-    title: 'ضرغام CNC | Dorgham CNC',
+    url: SITE_URL,
+    siteName: SITE_NAME_AR,
+    title: `${SITE_NAME_AR} | ${SITE_NAME_EN}`,
     description:
       'تصاميم خشبية فاخرة بتقنية CNC في العراق. جداريات، أبواب، وديكور مخصص.',
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: SITE_NAME_AR,
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ضرغام CNC | Dorgham CNC',
+    title: `${SITE_NAME_AR} | ${SITE_NAME_EN}`,
     description:
       'تصاميم خشبية فاخرة بتقنية CNC في العراق. جداريات، أبواب، وديكور مخصص.',
+    images: [DEFAULT_OG_IMAGE],
   },
   icons: {
     icon: '/favicon.svg',
@@ -54,7 +78,15 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
   },
+  category: 'business',
 }
 
 export const viewport: Viewport = {
@@ -72,6 +104,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
+        <link rel="preconnect" href={absoluteUrl('/')} />
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
         </Script>

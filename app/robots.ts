@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/seo'
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -6,10 +7,22 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin', '/admin/'],
+        disallow: [
+          '/admin',
+          '/admin/',
+          '/admin/*',
+          '/api/',
+          '/api/*',
+          '/saved',
+        ],
+      },
+      {
+        userAgent: 'Googlebot',
+        allow: '/',
+        disallow: ['/admin', '/admin/', '/admin/*', '/api/', '/api/*', '/saved'],
       },
     ],
-    sitemap: 'https://www.dhirghamcnc.com/sitemap.xml',
-    host: 'https://www.dhirghamcnc.com',
+    sitemap: `${SITE_URL}/sitemap.xml`,
+    host: SITE_URL,
   }
 }

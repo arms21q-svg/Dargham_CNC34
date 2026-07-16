@@ -1,19 +1,64 @@
 import type { MetadataRoute } from 'next'
+import { SITE_URL } from '@/lib/seo'
+import { prisma } from '@server/db'
 
-const siteUrl = 'https://www.dhirghamcnc.com'
+export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const routes = ['', '/works', '/about', '/faq', '/contact']
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const now = new Date()
 
-  return routes.map((route) => ({
-    url: `${siteUrl}${route}`,
-    lastModified: new Date(),
+  const staticRoutes: MetadataRoute.Sitemap = [
+    { url: SITE_URL, lastModified: now, changeFrequency: 'weekly', priority: 1 },
+    {
+      url: `${SITE_URL}/works`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.95,
+    },
+    {
+      url: `${SITE_URL}/works/all`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_URL}/about`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${SITE_URL}/faq`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.75,
+    },
+    {
+      url: `${SITE_URL}/contact`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.85,
+    },
+  ]
 
-    changeFrequency:
-      (route === '' || route === '/works'
-        ? 'weekly'
-        : 'monthly') as 'weekly' | 'monthly',
+  let productRoutes: MetadataRoute.Sitemap = []
+  if (process.env.NEXT_PHASE !== 'phase-production-build') {
+    try {
+      const products = await prisma.product.findMany({
+        select: { id: true, updatedAt: true },
+        orderBy: [{ featured: 'desc' }, { sortOrder: 'asc' }],
+      })
+      productRoutes = products.map((p) => ({
+        url: `${SITE_URL}/works/${p.id}`,
+        lastModified: p.updatedAt,
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }))
+    } catch {
+      // Runtime DB unavailable — keep static routes only
+    }
+  }
 
-    priority: route === '' ? 1 : route === '/works' ? 0.9 : 0.7,
-  }))
+  return [...staticRoutes, ...productRoutes]
 }

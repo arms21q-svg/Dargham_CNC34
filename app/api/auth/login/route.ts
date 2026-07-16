@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
+import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 import { getJwtSecret } from '@server/vercelAuth'
 
 export const maxDuration = 30
@@ -7,6 +8,9 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = rateLimit(`login:${clientIp(req)}`, 8, 60_000)
+    if (!limited.ok) return rateLimitResponse(limited.retryAfter)
+
     const bcrypt = (await import('bcryptjs')).default
     const jwt = (await import('jsonwebtoken')).default
 
@@ -15,6 +19,10 @@ export async function POST(req: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json({ ok: false, error: 'البريد وكلمة المرور مطلوبان' }, { status: 400 })
+    }
+
+    if (typeof email !== 'string' || typeof password !== 'string' || password.length > 200) {
+      return NextResponse.json({ ok: false, error: 'بيانات غير صالحة' }, { status: 400 })
     }
 
     const normalizedEmail = email.trim().toLowerCase()

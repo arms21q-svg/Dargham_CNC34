@@ -45,6 +45,9 @@ model AdminUser {
   role         String   @default("admin")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([role])
 }
 
 model Product {
@@ -64,6 +67,11 @@ model Product {
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([featured, sortOrder])
+  @@index([category, sortOrder])
+  @@index([sortOrder])
+  @@index([updatedAt])
 }
 
 model Manager {
@@ -75,4 +83,6 @@ model Manager {
   phone     String
   whatsapp  String?
   sortOrder Int     @default(0)
+
+  @@index([sortOrder])
 }

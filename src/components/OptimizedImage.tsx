@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useMemo, type ImgHTMLAttributes } from 'react'
+import { autoImageAlt } from '../lib/seo'
 import { imageSrcSet, optimizeImageUrl } from '../utils/images'
 
 interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'srcSet' | 'src'> {
@@ -38,6 +39,7 @@ export default function OptimizedImage({
     [src, width, priority]
   )
 
+  const safeAlt = useMemo(() => autoImageAlt(src, alt), [src, alt])
   const aspectHeight = height ?? Math.round(width * 0.75)
 
   if (shouldUseNativeImg(src)) {
@@ -51,11 +53,11 @@ export default function OptimizedImage({
         src={optimized}
         srcSet={srcSet}
         sizes={sizes}
-        alt={alt}
+        alt={safeAlt}
         className={className}
         loading={priority ? 'eager' : 'lazy'}
-        decoding={priority ? 'sync' : 'async'}
-        fetchPriority={priority ? 'high' : 'low'}
+        decoding={priority ? 'async' : 'async'}
+        fetchPriority={priority ? 'high' : 'auto'}
         width={width}
         height={aspectHeight}
         {...rest}
@@ -66,7 +68,7 @@ export default function OptimizedImage({
   return (
     <Image
       src={optimized}
-      alt={alt}
+      alt={safeAlt}
       width={width}
       height={aspectHeight}
       sizes={sizes}

@@ -59,7 +59,7 @@ export default function AdminLogin() {
           </div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">لوحة التحكم</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            أدخل البريد الإلكتروني وكلمة المرور
+            أدخل البريد أو اسم المستخدم وكلمة المرور
           </p>
         </div>
 
@@ -70,13 +70,14 @@ export default function AdminLogin() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="form-label">البريد الإلكتروني</label>
+              <label className="form-label">البريد أو اسم المستخدم</label>
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
                 placeholder="admin@dorghamcnc.com"
+                autoComplete="username"
                 required
                 autoFocus
               />

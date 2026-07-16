@@ -2,27 +2,35 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../db'
-import { generateRandomPassword } from '../utils/adminUsers'
-
 const router = Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body as { email?: string; password?: string }
+    const body = req.body as { email?: string; username?: string; password?: string }
+    const loginId = (body.email || body.username || '').trim().toLowerCase()
+    const { password } = body
 
-    if (!email || !password) {
-      res.status(400).json({ ok: false, error: 'البريد وكلمة المرور مطلوبان' })
+    if (!loginId || !password) {
+      res.status(400).json({ ok: false, error: 'البريد أو اسم المستخدم وكلمة المرور مطلوبان' })
       return
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { email: normalizedEmail },
+    const adminUser = await prisma.adminUser.findFirst({
+      where: {
+        OR: [{ email: loginId }, { username: loginId }],
+      },
     })
 
     if (adminUser) {
+      if (adminUser.status === 'disabled') {
+        res.status(403).json({
+          ok: false,
+          error: 'هذا الحساب معطّل. تواصل مع المدير الرئيسي.',
+        })
+        return
+      }
+
       const validPassword = await bcrypt.compare(password, adminUser.passwordHash)
       if (!validPassword) {
         res.status(401).json({ ok: false, error: 'بيانات الدخول غير صحيحة' })
@@ -54,7 +62,7 @@ router.post('/login', async (req, res) => {
       return
     }
 
-    const validEmail = normalizedEmail === config.adminEmail.toLowerCase()
+    const validEmail = loginId === config.adminEmail.toLowerCase()
     const validPassword = await bcrypt.compare(password, config.adminPasswordHash)
 
     if (!validEmail || !validPassword) {

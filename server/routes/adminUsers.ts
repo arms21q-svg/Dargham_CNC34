@@ -2,15 +2,25 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../db'
 import { requireAuth, requireSuperAdmin, type AuthRequest } from '../middleware/auth'
-import { generateRandomPassword } from '../utils/adminUsers'
+import {
+  allocateUniqueUsername,
+  ensureAdminUsernames,
+  generateRandomPassword,
+  isValidUsername,
+  normalizeUsername,
+  serializeAdminUser,
+  writeAdminAuditLog,
+} from '../utils/adminUsers'
 
 const router = Router()
 
 router.get('/', requireAuth, async (_req, res) => {
   try {
-    const [users, config] = await Promise.all([
+    await ensureAdminUsernames()
+    const [users, config, auditLogs] = await Promise.all([
       prisma.adminUser.findMany({ orderBy: { createdAt: 'asc' } }),
       prisma.siteConfig.findUnique({ where: { id: 1 } }),
+      prisma.adminAuditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 40 }),
     ])
 
     res.json({
@@ -23,13 +33,16 @@ router.get('/', requireAuth, async (_req, res) => {
             nameEn: 'Super Admin',
           }
         : null,
-      users: users.map((user) => ({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        nameAr: user.nameAr,
-        nameEn: user.nameEn,
-        createdAt: user.createdAt.toISOString(),
+      users: users.map(serializeAdminUser),
+      auditLogs: auditLogs.map((log) => ({
+        id: log.id,
+        action: log.action,
+        actorEmail: log.actorEmail,
+        actorRole: log.actorRole,
+        targetUserId: log.targetUserId,
+        targetEmail: log.targetEmail,
+        details: log.details,
+        createdAt: log.createdAt.toISOString(),
       })),
     })
   } catch (error) {
@@ -40,10 +53,11 @@ router.get('/', requireAuth, async (_req, res) => {
 
 router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const { email, nameAr = '', nameEn = '' } = req.body as {
+    const { email, nameAr = '', nameEn = '', username } = req.body as {
       email?: string
       nameAr?: string
       nameEn?: string
+      username?: string
     }
 
     const normalizedEmail = email?.trim().toLowerCase()
@@ -52,9 +66,32 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
       return
     }
 
+    const name = nameAr.trim()
+    if (!name) {
+      res.status(400).json({ ok: false, error: 'الاسم مطلوب' })
+      return
+    }
+
+    const preferredUsername = normalizeUsername(username || '')
+    if (!preferredUsername || !isValidUsername(preferredUsername)) {
+      res.status(400).json({
+        ok: false,
+        error: 'اسم المستخدم غير صالح (3–32 حرفاً: a-z و0-9 و . _ -)',
+      })
+      return
+    }
+
     const existing = await prisma.adminUser.findUnique({ where: { email: normalizedEmail } })
     if (existing) {
       res.status(409).json({ ok: false, error: 'هذا البريد مستخدم مسبقاً' })
+      return
+    }
+
+    const existingUsername = await prisma.adminUser.findUnique({
+      where: { username: preferredUsername },
+    })
+    if (existingUsername) {
+      res.status(409).json({ ok: false, error: 'اسم المستخدم مستخدم مسبقاً' })
       return
     }
 
@@ -66,27 +103,32 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
 
     const plainPassword = generateRandomPassword(12)
     const passwordHash = await bcrypt.hash(plainPassword, 10)
+    const uniqueUsername = await allocateUniqueUsername(preferredUsername)
 
     const user = await prisma.adminUser.create({
       data: {
         email: normalizedEmail,
+        username: uniqueUsername,
         passwordHash,
-        nameAr: nameAr.trim() || 'مسؤول',
-        nameEn: nameEn.trim() || 'Admin',
+        nameAr: name,
+        nameEn: nameEn.trim() || name,
         role: 'admin',
+        status: 'active',
       },
+    })
+
+    await writeAdminAuditLog({
+      action: 'user.create',
+      actorEmail: req.user?.email ?? '',
+      actorRole: req.user?.role ?? '',
+      targetUserId: user.id,
+      targetEmail: user.email,
+      details: `إنشاء حساب مسؤول — ${user.username}`,
     })
 
     res.json({
       ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        nameAr: user.nameAr,
-        nameEn: user.nameEn,
-        createdAt: user.createdAt.toISOString(),
-      },
+      user: serializeAdminUser(user),
       password: plainPassword,
       message: 'تم إنشاء الحساب — احفظ كلمة المرور الآن، لن تُعرض مرة أخرى',
     })
@@ -96,7 +138,7 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
   }
 })
 
-router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req, res) => {
+router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params
     const user = await prisma.adminUser.findUnique({ where: { id } })
@@ -111,17 +153,36 @@ router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req, r
       return
     }
 
-    const plainPassword = generateRandomPassword(12)
+    const customPassword =
+      typeof req.body?.password === 'string' ? req.body.password.trim() : ''
+    if (customPassword && customPassword.length < 8) {
+      res.status(400).json({ ok: false, error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' })
+      return
+    }
+
+    const plainPassword = customPassword || generateRandomPassword(12)
     const passwordHash = await bcrypt.hash(plainPassword, 10)
 
-    await prisma.adminUser.update({
+    const updated = await prisma.adminUser.update({
       where: { id },
       data: { passwordHash },
+    })
+
+    await writeAdminAuditLog({
+      action: customPassword ? 'user.set_password' : 'user.reset_password',
+      actorEmail: req.user?.email ?? '',
+      actorRole: req.user?.role ?? '',
+      targetUserId: user.id,
+      targetEmail: user.email,
+      details: customPassword
+        ? 'تم تعيين كلمة مرور جديدة يدوياً'
+        : 'تم إنشاء كلمة مرور عشوائية جديدة',
     })
 
     res.json({
       ok: true,
       password: plainPassword,
+      user: serializeAdminUser(updated),
       message: 'تم إنشاء كلمة مرور جديدة — احفظها الآن',
     })
   } catch (error) {
@@ -130,7 +191,7 @@ router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req, r
   }
 })
 
-router.delete('/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+router.delete('/:id', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params
     const user = await prisma.adminUser.findUnique({ where: { id } })
@@ -146,6 +207,14 @@ router.delete('/:id', requireAuth, requireSuperAdmin, async (req, res) => {
     }
 
     await prisma.adminUser.delete({ where: { id } })
+    await writeAdminAuditLog({
+      action: 'user.delete',
+      actorEmail: req.user?.email ?? '',
+      actorRole: req.user?.role ?? '',
+      targetUserId: user.id,
+      targetEmail: user.email,
+      details: 'حذف حساب مسؤول',
+    })
     res.json({ ok: true, message: 'تم حذف الحساب' })
   } catch (error) {
     console.error('Delete admin user error:', error)

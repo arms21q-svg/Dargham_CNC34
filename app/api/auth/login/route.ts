@@ -27,25 +27,41 @@ export async function POST(req: NextRequest) {
     const bcrypt = (await import('bcryptjs')).default
     const jwt = (await import('jsonwebtoken')).default
 
-    const body = (await req.json().catch(() => ({}))) as { email?: string; password?: string }
-    const { email, password } = body
+    const body = (await req.json().catch(() => ({}))) as {
+      email?: string
+      username?: string
+      password?: string
+    }
+    const loginId = (body.email || body.username || '').trim().toLowerCase()
+    const { password } = body
 
-    if (!email || !password) {
-      return NextResponse.json({ ok: false, error: 'البريد وكلمة المرور مطلوبان' }, { status: 400 })
+    if (!loginId || !password) {
+      return NextResponse.json(
+        { ok: false, error: 'البريد أو اسم المستخدم وكلمة المرور مطلوبان' },
+        { status: 400 }
+      )
     }
 
-    if (typeof email !== 'string' || typeof password !== 'string' || password.length > 200) {
+    if (typeof password !== 'string' || password.length > 200) {
       return NextResponse.json({ ok: false, error: 'بيانات غير صالحة' }, { status: 400 })
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
     const JWT_SECRET = getJwtSecret()
 
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { email: normalizedEmail },
+    const adminUser = await prisma.adminUser.findFirst({
+      where: {
+        OR: [{ email: loginId }, { username: loginId }],
+      },
     })
 
     if (adminUser) {
+      if (adminUser.status === 'disabled') {
+        return NextResponse.json(
+          { ok: false, error: 'هذا الحساب معطّل. تواصل مع المدير الرئيسي.' },
+          { status: 403 }
+        )
+      }
+
       const validPassword = await bcrypt.compare(password, adminUser.passwordHash)
       if (validPassword) {
         const token = jwt.sign(
@@ -78,7 +94,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const validEmail = normalizedEmail === config.adminEmail.toLowerCase()
+    const validEmail = loginId === config.adminEmail.toLowerCase()
     const validPassword = await bcrypt.compare(password, config.adminPasswordHash)
 
     if (!validEmail || !validPassword) {

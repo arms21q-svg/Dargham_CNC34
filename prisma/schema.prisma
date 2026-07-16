@@ -39,15 +39,33 @@ model SiteConfig {
 model AdminUser {
   id           String   @id @default(uuid())
   email        String   @unique
+  username     String?  @unique
   passwordHash String
   nameAr       String   @default("")
   nameEn       String   @default("")
   role         String   @default("admin")
+  /** active | disabled */
+  status       String   @default("active")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([createdAt])
   @@index([role])
+  @@index([status])
+}
+
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  action       String
+  actorEmail   String
+  actorRole    String   @default("")
+  targetUserId String?
+  targetEmail  String?
+  details      String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
 }
 
 model Product {

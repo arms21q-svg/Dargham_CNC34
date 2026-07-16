@@ -7,6 +7,7 @@ import AdminAccountSettings from '../../components/admin/AdminAccountSettings'
 
 const cards = [
   { to: '/admin/home', title: 'الصفحة الرئيسية', desc: 'العنوان والوصف وصور السلايدر', icon: '🏠' },
+  { to: '/admin/about', title: 'من نحن', desc: 'القصة والمهمة والرؤية والإحصائيات', icon: '📖' },
   { to: '/admin/works', title: 'أعمالنا', desc: 'إضافة وتعديل وحذف الأعمال', icon: '🪵' },
   { to: '/admin/contact', title: 'روابط التواصل', desc: 'واتساب، فيسبوك، الموقع', icon: '📞' },
   { to: '/admin/managers', title: 'حسابات المستخدمين', desc: 'إنشاء حساب بريد + كلمة سر عشوائية', icon: '👥' },

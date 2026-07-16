@@ -7,6 +7,7 @@ import { useSiteData } from '../../context/SiteDataContext'
 const links = [
   { to: '/admin', label: 'الرئيسية', end: true },
   { to: '/admin/home', label: 'الصفحة الرئيسية' },
+  { to: '/admin/about', label: 'من نحن' },
   { to: '/admin/works', label: 'أعمالنا' },
   { to: '/admin/contact', label: 'روابط التواصل' },
   { to: '/admin/managers', label: 'حسابات المستخدمين' },

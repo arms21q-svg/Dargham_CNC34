@@ -41,6 +41,7 @@ export function mergeSiteData(base: SiteData, patch: Partial<SiteData>): SiteDat
     ...base,
     ...patch,
     home: { ...base.home, ...patch.home },
+    about: { ...base.about, ...patch.about, stats: patch.about?.stats ?? base.about.stats },
     contact: { ...base.contact, ...patch.contact },
     settings: { ...base.settings, ...patch.settings },
     products: patch.products ?? base.products,

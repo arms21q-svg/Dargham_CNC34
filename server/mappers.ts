@@ -1,5 +1,44 @@
 import type { Manager as DbManager, Product as DbProduct, SiteConfig } from '@prisma/client'
-import type { FloatLink, SiteData } from '../src/types/siteData'
+import { createDefaultAboutSettings } from '../src/data/defaultSiteData'
+import type { AboutSettings, FloatLink, SiteData } from '../src/types/siteData'
+
+function parseAbout(raw: unknown): AboutSettings {
+  const defaults = createDefaultAboutSettings()
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults
+
+  const o = raw as Partial<AboutSettings>
+  const bilingual = (
+    field: keyof Omit<AboutSettings, 'image' | 'stats'>,
+    fallback: { ar: string; en: string }
+  ) => ({
+    ar: typeof o[field]?.ar === 'string' ? o[field]!.ar : fallback.ar,
+    en: typeof o[field]?.en === 'string' ? o[field]!.en : fallback.en,
+  })
+
+  const stats =
+    Array.isArray(o.stats) && o.stats.length > 0
+      ? o.stats.map((s, i) => ({
+          value: typeof s?.value === 'string' ? s.value : defaults.stats[i]?.value ?? '',
+          label: {
+            ar: typeof s?.label?.ar === 'string' ? s.label.ar : defaults.stats[i]?.label.ar ?? '',
+            en: typeof s?.label?.en === 'string' ? s.label.en : defaults.stats[i]?.label.en ?? '',
+          },
+        }))
+      : defaults.stats
+
+  return {
+    title: bilingual('title', defaults.title),
+    subtitle: bilingual('subtitle', defaults.subtitle),
+    story: bilingual('story', defaults.story),
+    storyText: bilingual('storyText', defaults.storyText),
+    mission: bilingual('mission', defaults.mission),
+    missionText: bilingual('missionText', defaults.missionText),
+    vision: bilingual('vision', defaults.vision),
+    visionText: bilingual('visionText', defaults.visionText),
+    image: typeof o.image === 'string' && o.image.trim() ? o.image : defaults.image,
+    stats,
+  }
+}
 
 function parseFloatLinks(raw: unknown, config: SiteConfig): FloatLink[] {
   if (Array.isArray(raw) && raw.length > 0) {
@@ -44,6 +83,7 @@ export function toSiteData(
       heroDesc: { ar: config.heroDescAr, en: config.heroDescEn },
       slideImages: config.slideImages,
     },
+    about: parseAbout(config.about),
     contact: {
       whatsapp: config.whatsapp,
       facebook: config.facebook,
@@ -89,6 +129,7 @@ export function configFromSiteData(data: SiteData, passwordHash: string) {
   const contact = data.contact
   const settings = data.settings
   const ai = contact.aiAssistant
+  const about = parseAbout(data.about)
 
   return {
     version: data.version ?? 1,
@@ -109,6 +150,7 @@ export function configFromSiteData(data: SiteData, passwordHash: string) {
     floatLinks: JSON.parse(
       JSON.stringify(Array.isArray(contact?.floatLinks) ? contact.floatLinks : [])
     ) as object[],
+    about: JSON.parse(JSON.stringify(about)) as object,
     aiEnabled: ai?.enabled ?? true,
     aiWelcomeAr:
       ai?.welcomeMessage?.ar ??

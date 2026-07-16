@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { SiteData, Manager, Product } from '../types/siteData'
-import type { HomeSettings, ContactSettings } from '../types/siteData'
+import type { AboutSettings, HomeSettings, ContactSettings } from '../types/siteData'
 import {
   createDefaultSiteData,
   DEFAULT_ADMIN_EMAIL,
@@ -34,6 +34,7 @@ interface SiteDataContextType {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   updateHome: (home: Partial<HomeSettings>) => void
+  updateAbout: (about: Partial<AboutSettings>) => void
   updateContact: (contact: Partial<ContactSettings>) => void
   updateProducts: (products: Product[]) => void
   addProduct: (product: Product) => void
@@ -57,6 +58,11 @@ function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
     ...patch,
     updatedAt: Date.now(),
     home: { ...prev.home, ...patch.home },
+    about: {
+      ...prev.about,
+      ...patch.about,
+      stats: patch.about?.stats ?? prev.about.stats,
+    },
     contact: { ...prev.contact, ...patch.contact },
     settings: { ...prev.settings, ...patch.settings },
     products: patch.products ?? prev.products,
@@ -153,6 +159,10 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
     setSiteData((prev) => patchData(prev, { home: { ...prev.home, ...home } }))
   }, [])
 
+  const updateAbout = useCallback((about: Partial<AboutSettings>) => {
+    setSiteData((prev) => patchData(prev, { about: { ...prev.about, ...about } }))
+  }, [])
+
   const updateContact = useCallback((contact: Partial<ContactSettings>) => {
     setSiteData((prev) => patchData(prev, { contact: { ...prev.contact, ...contact } }))
   }, [])
@@ -236,6 +246,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         updateHome,
+        updateAbout,
         updateContact,
         updateProducts,
         addProduct,

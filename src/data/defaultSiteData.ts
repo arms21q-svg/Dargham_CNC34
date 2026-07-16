@@ -1,8 +1,32 @@
 import { products, slideImages, translations } from './content'
-import type { SiteData } from '../types/siteData'
+import type { AboutSettings, SiteData } from '../types/siteData'
 
 export const DEFAULT_ADMIN_EMAIL = 'admin@dorghamcnc.com'
 export const DEFAULT_ADMIN_PASSWORD = 'dorgham2026'
+
+export const DEFAULT_ABOUT_IMAGE =
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80'
+
+export function createDefaultAboutSettings(): AboutSettings {
+  const ar = translations.ar.about
+  const en = translations.en.about
+
+  return {
+    title: { ar: ar.title, en: en.title },
+    subtitle: { ar: ar.subtitle, en: en.subtitle },
+    story: { ar: ar.story, en: en.story },
+    storyText: { ar: ar.storyText, en: en.storyText },
+    mission: { ar: ar.mission, en: en.mission },
+    missionText: { ar: ar.missionText, en: en.missionText },
+    vision: { ar: ar.vision, en: en.vision },
+    visionText: { ar: ar.visionText, en: en.visionText },
+    image: DEFAULT_ABOUT_IMAGE,
+    stats: ar.stats.map((stat, i) => ({
+      value: stat.value,
+      label: { ar: stat.label, en: en.stats[i]?.label ?? stat.label },
+    })),
+  }
+}
 
 export function createDefaultSiteData(): SiteData {
   const ar = translations.ar
@@ -17,6 +41,7 @@ export function createDefaultSiteData(): SiteData {
       heroDesc: { ar: ar.home.heroDesc, en: en.home.heroDesc },
       slideImages: [...slideImages],
     },
+    about: createDefaultAboutSettings(),
     contact: {
       whatsapp: '9647701234567',
       facebook: 'https://www.facebook.com/dorghamcnc',

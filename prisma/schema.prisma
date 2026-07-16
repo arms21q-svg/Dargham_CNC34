@@ -27,6 +27,7 @@ model SiteConfig {
   whatsappMsgAr    String
   whatsappMsgEn    String
   floatLinks       Json     @default("[]")
+  about            Json     @default("{}")
   aiEnabled        Boolean  @default(true)
   aiWelcomeAr      String   @default("مرحباً! أنا مساعد ضرغام CNC. اسألني عن أعمالنا وخدماتنا.")
   aiWelcomeEn      String   @default("Hello! I am Dorgham CNC assistant. Ask about our works and services.")

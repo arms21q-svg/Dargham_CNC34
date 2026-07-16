@@ -7,6 +7,24 @@ export interface HomeSettings {
   slideImages: string[]
 }
 
+export interface AboutStat {
+  value: string
+  label: { ar: string; en: string }
+}
+
+export interface AboutSettings {
+  title: { ar: string; en: string }
+  subtitle: { ar: string; en: string }
+  story: { ar: string; en: string }
+  storyText: { ar: string; en: string }
+  mission: { ar: string; en: string }
+  missionText: { ar: string; en: string }
+  vision: { ar: string; en: string }
+  visionText: { ar: string; en: string }
+  image: string
+  stats: AboutStat[]
+}
+
 export interface ContactSettings {
   whatsapp: string
   facebook: string
@@ -58,6 +76,7 @@ export interface SiteData {
   version: number
   updatedAt?: number
   home: HomeSettings
+  about: AboutSettings
   contact: ContactSettings
   products: Product[]
   managers: Manager[]

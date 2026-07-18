@@ -44,6 +44,8 @@ model AdminUser {
   nameAr       String   @default("")
   nameEn       String   @default("")
   role         String   @default("admin")
+  /** Job title shown in employee management (e.g. محرر محتوى) */
+  jobTitle     String   @default("")
   /** active | disabled */
   status       String   @default("active")
   createdAt    DateTime @default(now())

@@ -1,116 +1,133 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-const SPLASH_MS = 3000
-const SESSION_KEY = 'dorgham-cnc-splash-seen'
+const DISPLAY_MS = 2400
+const FADE_MS = 500
+const STORAGE_KEY = 'dorgham-cnc-splash-v2'
+/** Re-show after this many days, or when browser storage is cleared. */
+const RESHOW_AFTER_DAYS = 7
 
-interface BrandSplashProps {
-  /** Skip splash on admin routes */
-  skip?: boolean
+function shouldShowSplash(): boolean {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return true
+    const seenAt = Number(raw)
+    if (!Number.isFinite(seenAt)) return true
+    return Date.now() - seenAt > RESHOW_AFTER_DAYS * 24 * 60 * 60 * 1000
+  } catch {
+    return false
+  }
+}
+
+function markSplashSeen() {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(Date.now()))
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
- * Elegant brand intro — once per browser tab session when opening the site.
+ * First-visit brand splash (black & gold). Site loads underneath; no reload on dismiss.
  */
-export default function BrandSplash({ skip = false }: BrandSplashProps) {
-  const [visible, setVisible] = useState(false)
-  const [leaving, setLeaving] = useState(false)
+export default function BrandSplash({ skip = false }: { skip?: boolean }) {
+  const [phase, setPhase] = useState<'hidden' | 'show' | 'leave'>('hidden')
+  const [canSkip, setCanSkip] = useState(false)
+
+  const dismiss = useCallback(() => {
+    setPhase((prev) => (prev === 'show' ? 'leave' : prev))
+  }, [])
 
   useEffect(() => {
     if (skip) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    if (sessionStorage.getItem(SESSION_KEY) === '1') return
-    setVisible(true)
+    if (!shouldShowSplash()) return
+    setPhase('show')
   }, [skip])
 
   useEffect(() => {
-    if (!visible) return
+    if (phase !== 'show') return
 
-    const leaveTimer = window.setTimeout(() => setLeaving(true), SPLASH_MS - 450)
-    const hideTimer = window.setTimeout(() => {
-      sessionStorage.setItem(SESSION_KEY, '1')
-      setVisible(false)
-    }, SPLASH_MS)
-
-    return () => {
-      window.clearTimeout(leaveTimer)
-      window.clearTimeout(hideTimer)
+    const syncSkip = () => {
+      if (document.readyState === 'complete') setCanSkip(true)
     }
-  }, [visible])
+    syncSkip()
+    window.addEventListener('load', syncSkip)
 
-  if (!visible) return null
+    const leaveTimer = window.setTimeout(() => setPhase('leave'), DISPLAY_MS)
+    return () => {
+      window.removeEventListener('load', syncSkip)
+      window.clearTimeout(leaveTimer)
+    }
+  }, [phase])
+
+  useEffect(() => {
+    if (phase !== 'leave') return
+    markSplashSeen()
+    const hideTimer = window.setTimeout(() => setPhase('hidden'), FADE_MS)
+    return () => window.clearTimeout(hideTimer)
+  }, [phase])
+
+  useEffect(() => {
+    if (phase === 'hidden') return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [phase])
+
+  if (phase === 'hidden') return null
+
+  const leaving = phase === 'leave'
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center overflow-hidden transition-opacity duration-450 ${
-        leaving ? 'pointer-events-none opacity-0' : 'opacity-100'
-      }`}
-      style={{
-        background:
-          'radial-gradient(ellipse at 30% 20%, #5a9f82 0%, transparent 45%), radial-gradient(ellipse at 80% 80%, #3d7a5f 0%, transparent 40%), linear-gradient(160deg, #1a2f28 0%, #2d5244 45%, #1f3d33 100%)',
+      className={`brand-splash${leaving ? ' brand-splash--out' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="مرحبًا بكم في ضرغام CNC"
+      onClick={() => {
+        if (canSkip) dismiss()
       }}
-      role="status"
-      aria-label="ضرغام CNC"
+      onKeyDown={(e) => {
+        if (!canSkip) return
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          dismiss()
+        }
+      }}
+      tabIndex={canSkip ? 0 : -1}
     >
-      <div className="pointer-events-none absolute inset-0 opacity-20">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.35) 1px, transparent 0)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-      </div>
+      <div className="brand-splash__glow" aria-hidden />
 
-      <div className="relative flex flex-col items-center px-6 text-center">
-        <div
-          className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 text-4xl font-extrabold text-white shadow-2xl ring-1 ring-white/25 backdrop-blur-md"
-          style={{ animation: 'splashMark 0.7s ease-out both' }}
-        >
-          D
+      <div className="brand-splash__content">
+        <div className="brand-splash__logo-wrap">
+          <picture>
+            <source srcSet="/splash-logo.webp" type="image/webp" />
+            <img
+              src="/splash-logo.png"
+              alt="ضرغام CNC"
+              width={512}
+              height={512}
+              decoding="async"
+              fetchPriority="high"
+              className="brand-splash__logo"
+              draggable={false}
+            />
+          </picture>
         </div>
 
-        <h1
-          className="font-arabic text-4xl font-extrabold tracking-wide text-white sm:text-5xl"
-          style={{ animation: 'splashTitle 0.8s ease-out 0.15s both' }}
-        >
-          ضرغام CNC
-        </h1>
+        <h1 className="brand-splash__title">مرحبًا بكم في ضرغام CNC</h1>
 
-        <p
-          className="mt-3 font-english text-sm font-medium tracking-[0.35em] text-white/70 uppercase sm:text-base"
-          style={{ animation: 'splashTitle 0.8s ease-out 0.3s both' }}
-        >
-          Dorgham CNC
+        <p className="brand-splash__desc">
+          نقدم حلولًا احترافية في أعمال CNC، الديكورات، المطابخ، والإكسسوارات بأعلى معايير
+          الجودة والدقة.
         </p>
 
-        <div
-          className="mt-8 h-0.5 w-16 overflow-hidden rounded-full bg-white/20"
-          style={{ animation: 'splashTitle 0.6s ease-out 0.45s both' }}
-        >
-          <div
-            className="h-full rounded-full bg-white/80"
-            style={{ animation: 'splashBar 2.4s ease-in-out 0.5s both' }}
-          />
-        </div>
+        {canSkip ? <p className="brand-splash__skip">اضغط للمتابعة</p> : null}
       </div>
-
-      <style>{`
-        @keyframes splashMark {
-          from { opacity: 0; transform: scale(0.7) translateY(12px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes splashTitle {
-          from { opacity: 0; transform: translateY(14px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes splashBar {
-          from { width: 0%; }
-          to { width: 100%; }
-        }
-      `}</style>
     </div>
   )
 }

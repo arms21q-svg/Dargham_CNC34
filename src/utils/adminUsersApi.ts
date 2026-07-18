@@ -8,6 +8,7 @@ export interface AdminUserRecord {
   role: string
   nameAr: string
   nameEn: string
+  jobTitle?: string
   status: 'active' | 'disabled' | string
   createdAt: string
 }
@@ -54,9 +55,11 @@ export async function fetchAdminUsers(): Promise<AdminUsersResponse> {
 
 export async function createAdminUser(payload: {
   email: string
-  username: string
   nameAr: string
   nameEn?: string
+  username?: string
+  password?: string
+  jobTitle?: string
 }): Promise<{
   ok: boolean
   user?: AdminUserRecord

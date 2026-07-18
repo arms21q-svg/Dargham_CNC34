@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { SiteData, Manager, Product } from '../types/siteData'
-import type { AboutSettings, HomeSettings, ContactSettings } from '../types/siteData'
+import type { HomeSettings, ContactSettings } from '../types/siteData'
 import {
   createDefaultSiteData,
   DEFAULT_ADMIN_EMAIL,
@@ -18,12 +18,15 @@ import {
 import {
   ADMIN_AUTH_KEY,
   getAuthToken,
+  getAdminRole,
+  isSuperAdminSession,
   isVercelHost,
   loadFromLocalStorageSync,
   loadSiteData,
   loginWithApi,
   publishSiteData,
   saveSiteDataLocal,
+  setAdminRole,
   setAdminSessionCookie,
   setAuthToken,
 } from '../utils/siteDataStorage'
@@ -32,10 +35,11 @@ interface SiteDataContextType {
   siteData: SiteData
   loading: boolean
   isAdmin: boolean
+  adminRole: string | null
+  isSuperAdmin: boolean
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   updateHome: (home: Partial<HomeSettings>) => void
-  updateAbout: (about: Partial<AboutSettings>) => void
   updateContact: (contact: Partial<ContactSettings>) => void
   updateProducts: (products: Product[]) => void
   addProduct: (product: Product) => void
@@ -75,6 +79,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   const [siteData, setSiteData] = useState<SiteData>(() => createDefaultSiteData())
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminRole, setAdminRoleState] = useState<string | null>(null)
 
   useEffect(() => {
     const local = loadFromLocalStorageSync()
@@ -85,9 +90,14 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem(ADMIN_AUTH_KEY)
       setAdminSessionCookie(false)
       setIsAdmin(false)
+      setAdminRole(null)
+      setAdminRoleState(null)
     } else {
       setIsAdmin(flagged)
-      if (flagged) setAdminSessionCookie(true)
+      if (flagged) {
+        setAdminSessionCookie(true)
+        setAdminRoleState(getAdminRole())
+      }
     }
 
     let cancelled = false
@@ -118,6 +128,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
       setAdminSessionCookie(true)
       setIsAdmin(true)
+      setAdminRoleState(apiResult.role ?? getAdminRole())
       const fresh = await loadSiteData()
       setSiteData(fresh)
       return { ok: true }
@@ -143,6 +154,8 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
     if (inputEmail === expectedEmail && password === expectedPassword) {
       sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
       setAdminSessionCookie(true)
+      setAdminRole('super')
+      setAdminRoleState('super')
       setIsAdmin(true)
       return { ok: true }
     }
@@ -157,16 +170,14 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     sessionStorage.removeItem(ADMIN_AUTH_KEY)
     setAuthToken(null)
+    setAdminRole(null)
     setAdminSessionCookie(false)
     setIsAdmin(false)
+    setAdminRoleState(null)
   }, [])
 
   const updateHome = useCallback((home: Partial<HomeSettings>) => {
     setSiteData((prev) => patchData(prev, { home: { ...prev.home, ...home } }))
-  }, [])
-
-  const updateAbout = useCallback((about: Partial<AboutSettings>) => {
-    setSiteData((prev) => patchData(prev, { about: { ...prev.about, ...about } }))
   }, [])
 
   const updateContact = useCallback((contact: Partial<ContactSettings>) => {
@@ -249,10 +260,11 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
         siteData,
         loading,
         isAdmin,
+        adminRole,
+        isSuperAdmin: adminRole === 'super' || isSuperAdminSession(),
         login,
         logout,
         updateHome,
-        updateAbout,
         updateContact,
         updateProducts,
         addProduct,

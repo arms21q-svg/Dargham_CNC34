@@ -111,12 +111,3 @@ export function searchProductsByText(
   hits.sort((a, b) => b.score - a.score || a.product.title[lang].localeCompare(b.product.title[lang], lang))
   return hits
 }
-
-export function filterProductsByText(
-  products: Product[],
-  query: string,
-  lang: Lang
-): Product[] {
-  if (!normalizeSearchText(query)) return products
-  return searchProductsByText(products, query, lang).map((h) => h.product)
-}

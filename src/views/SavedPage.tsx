@@ -28,7 +28,7 @@ export default function SavedPage() {
             </div>
             <p className="mb-4 text-gray-500 dark:text-gray-400">{t.works.noResults}</p>
             <Link href="/works" className="btn-primary">
-              {t.works.allWorks}
+              {t.works.featured}
             </Link>
           </div>
         ) : (

@@ -7,14 +7,14 @@ import { useSiteData } from '../../context/SiteDataContext'
 const links = [
   { to: '/admin', label: 'الرئيسية', end: true },
   { to: '/admin/home', label: 'الصفحة الرئيسية' },
-  { to: '/admin/about', label: 'من نحن' },
   { to: '/admin/works', label: 'أعمالنا' },
   { to: '/admin/contact', label: 'روابط التواصل' },
-  { to: '/admin/managers', label: 'حسابات المستخدمين' },
+  { to: '/admin/managers', label: 'فريق العمل' },
+  { to: '/admin/employees', label: 'إدارة الموظفين', superOnly: true },
 ]
 
 export default function AdminSidebar() {
-  const { logout } = useSiteData()
+  const { logout, isSuperAdmin } = useSiteData()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -28,6 +28,8 @@ export default function AdminSidebar() {
     return pathname === to || pathname.startsWith(`${to}/`)
   }
 
+  const visibleLinks = links.filter((link) => !link.superOnly || isSuperAdmin)
+
   return (
     <aside className="w-64 shrink-0 border-e border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="border-b border-gray-200 p-5 dark:border-gray-800">
@@ -36,7 +38,7 @@ export default function AdminSidebar() {
       </div>
 
       <nav className="flex flex-col gap-1 p-3">
-        {links.map((link) => (
+        {visibleLinks.map((link) => (
           <Link
             key={link.to}
             href={link.to}

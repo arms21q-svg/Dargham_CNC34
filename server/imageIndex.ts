@@ -62,8 +62,9 @@ async function bufferFromSource(src: string): Promise<Buffer | null> {
 
 export async function featuresFromBase64(
   imageBase64: string,
-  _mimeType = 'image/jpeg'
+  _mimeType?: string
 ): Promise<VisualFeatures | null> {
+  void _mimeType
   try {
     const input = Buffer.from(imageBase64, 'base64')
     return await featuresFromBuffer(input)

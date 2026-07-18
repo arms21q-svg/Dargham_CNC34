@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import MobileBottomNav from '@/components/MobileBottomNav'
 import BrandSplash from '@/components/BrandSplash'
 
 const ContactFloat = lazy(() => import('@/components/ContactFloat'))
@@ -53,12 +54,13 @@ export default function PublicShell({ children }: { children: ReactNode }) {
         تخطي إلى المحتوى
       </a>
       <BrandSplash skip={false} />
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col pb-[4.75rem] md:pb-0">
         <Header />
         <main id="main-content" className="flex-1" tabIndex={-1}>
           <PageTransition>{children}</PageTransition>
         </main>
         <Footer />
+        <MobileBottomNav />
         <DeferredFloat />
       </div>
     </>

@@ -48,7 +48,6 @@ export default function OptimizedImage({
         ? undefined
         : imageSrcSet(src, widths, priority ? 78 : 72)
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={optimized}
         srcSet={srcSet}

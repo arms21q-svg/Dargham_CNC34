@@ -6,7 +6,7 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=()',
+    value: 'camera=(self), microphone=(), geolocation=()',
   },
   {
     key: 'Strict-Transport-Security',
@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.supabase.co' },
       { protocol: 'https', hostname: '**.imgix.net' },
     ],
+  },
+  async redirects() {
+    return [
+      { source: '/about', destination: '/', permanent: true },
+      { source: '/faq', destination: '/', permanent: true },
+    ]
   },
   async headers() {
     return [

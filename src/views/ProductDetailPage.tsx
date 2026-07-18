@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import ProductCard from '../components/ProductCard'
+import OptimizedImage from '../components/OptimizedImage'
 import { categoryLabels } from '../data/content'
 import { downloadImage } from '../utils/imageSearch'
 import { useApp } from '../context/AppContext'
@@ -39,9 +40,13 @@ export default function ProductDetailPage() {
 
         <div className="grid gap-8 lg:grid-cols-2">
           <div className="overflow-hidden rounded-2xl">
-            <img
+            <OptimizedImage
               src={product.image}
               alt={product.title[lang]}
+              width={1200}
+              widths={[640, 960, 1200]}
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              priority
               className="h-full w-full object-cover"
             />
           </div>

@@ -8,6 +8,7 @@ import { apiUrl } from './apiBase'
 export const SITE_DATA_KEY = 'dorgham-cnc-site-data'
 export const ADMIN_AUTH_KEY = 'dorgham-cnc-admin-auth'
 export const AUTH_TOKEN_KEY = 'dorgham-cnc-auth-token'
+export const ADMIN_ROLE_KEY = 'dorgham-cnc-admin-role'
 
 /** Static hosting (cPanel only) — Vercel does not run PHP. */
 const STATIC_SAVE_ENDPOINT = apiUrl('/api/save-data.php')
@@ -48,8 +49,38 @@ export function setAuthToken(token: string | null) {
     setAdminSessionCookie(true)
   } else {
     sessionStorage.removeItem(AUTH_TOKEN_KEY)
+    sessionStorage.removeItem(ADMIN_ROLE_KEY)
     setAdminSessionCookie(false)
   }
+}
+
+export function setAdminRole(role: string | null) {
+  if (typeof window === 'undefined') return
+  if (role) sessionStorage.setItem(ADMIN_ROLE_KEY, role)
+  else sessionStorage.removeItem(ADMIN_ROLE_KEY)
+}
+
+export function getAdminRole(): string | null {
+  if (typeof window === 'undefined') return null
+  const stored = sessionStorage.getItem(ADMIN_ROLE_KEY)
+  if (stored) return stored
+
+  const token = getAuthToken()
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1] ?? '')) as { role?: string }
+    if (payload.role) {
+      sessionStorage.setItem(ADMIN_ROLE_KEY, payload.role)
+      return payload.role
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+export function isSuperAdminSession(): boolean {
+  return getAdminRole() === 'super'
 }
 
 export function mergeSiteData(base: SiteData, patch: Partial<SiteData>): SiteData {
@@ -214,9 +245,10 @@ export function downloadSiteData(data: SiteData) {
 export async function loginWithApi(
   email: string,
   password: string
-): Promise<{ ok: boolean; error?: string; useFallback?: boolean }> {
+): Promise<{ ok: boolean; error?: string; useFallback?: boolean; role?: string }> {
   try {
-    const res = await fetchWithTimeout(apiUrl('/api/auth/login'), {      method: 'POST',
+    const res = await fetchWithTimeout(apiUrl('/api/auth/login'), {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
@@ -224,7 +256,12 @@ export async function loginWithApi(
       return { ok: false, useFallback: true, error: 'تعذر الاتصال بالسيرفر' }
     }
 
-    let json: { ok?: boolean; token?: string; error?: string } = {}
+    let json: {
+      ok?: boolean
+      token?: string
+      error?: string
+      user?: { role?: string }
+    } = {}
     try {
       json = (await res.json()) as typeof json
     } catch {
@@ -233,7 +270,9 @@ export async function loginWithApi(
 
     if (res.ok && json.ok && json.token) {
       setAuthToken(json.token)
-      return { ok: true }
+      const role = json.user?.role ?? 'admin'
+      setAdminRole(role)
+      return { ok: true, role }
     }
 
     const useFallback = res.status >= 500 || res.status === 404 || res.status === 503

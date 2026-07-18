@@ -4,7 +4,6 @@ import { useState } from 'react'
 import type { Manager } from '../../types/siteData'
 import { useSiteData } from '../../context/SiteDataContext'
 import AdminSaveBar from '../../components/admin/AdminSaveBar'
-import AdminAccountSettings from '../../components/admin/AdminAccountSettings'
 
 const emptyManager = (): Manager => ({
   id: crypto.randomUUID(),
@@ -54,19 +53,13 @@ export default function AdminManagers() {
     <div>
       <AdminSaveBar />
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">حسابات المستخدمين</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          إدارة حسابات الدخول: الاسم، اسم المستخدم، البريد، النوع، الحالة، وتاريخ الإنشاء
-        </p>
-      </div>
-
-      <div className="mb-10">
-        <AdminAccountSettings />
-      </div>
-
-      <div className="mb-6 flex items-center justify-between border-t border-gray-200 pt-8 dark:border-gray-800">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">فريق العمل (للتواصل)</h2>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">فريق العمل</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            بيانات التواصل المعروضة في صفحة اتصل بنا (ليست حسابات دخول)
+          </p>
+        </div>
         <button onClick={startAdd} className="btn-primary !px-4 !py-2 text-sm">
           + إضافة مسؤول
         </button>

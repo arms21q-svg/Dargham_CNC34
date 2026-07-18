@@ -80,7 +80,7 @@ export function organizationSchema() {
     name: SITE_NAME_AR,
     alternateName: SITE_NAME_EN,
     url: SITE_URL,
-    logo: absoluteUrl('/favicon.svg'),
+    logo: absoluteUrl('/logo.png'),
     sameAs: ['https://www.facebook.com/dorghamcnc'],
     areaServed: {
       '@type': 'Country',
@@ -146,21 +146,6 @@ export function breadcrumbSchema(items: { name: string; path: string }[]) {
       position: index + 1,
       name: item.name,
       item: absoluteUrl(item.path),
-    })),
-  }
-}
-
-export function faqSchema(items: { q: string; a: string }[]) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: items.map((item) => ({
-      '@type': 'Question',
-      name: item.q,
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: item.a,
-      },
     })),
   }
 }

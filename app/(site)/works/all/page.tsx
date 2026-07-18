@@ -2,13 +2,13 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import AllWorksPage from '@/views/AllWorksPage'
 import JsonLd from '@/components/seo/JsonLd'
-import { breadcrumbSchema, buildPageMetadata } from '@/lib/seo'
+import { breadcrumbSchema, buildPageMetadata, DEFAULT_OG_IMAGE } from '@/lib/seo'
 
 export const metadata: Metadata = buildPageMetadata({
   path: '/works/all',
-  title: 'كل الأعمال',
-  description:
-    'تصفح جميع أعمال ضرغام CNC مع البحث النصي والفلاتر والبحث بالصورة لإيجاد التصاميم المشابهة.',
+  title: 'جميع الأعمال',
+  description: 'استعرض جميع أعمال ضرغام CNC — جداريات وأبواب وديكور خشبي بتقنية CNC.',
+  image: DEFAULT_OG_IMAGE,
 })
 
 export default function Page() {
@@ -17,8 +17,8 @@ export default function Page() {
       <JsonLd
         data={breadcrumbSchema([
           { name: 'الرئيسية', path: '/' },
-          { name: 'أعمالنا', path: '/works' },
-          { name: 'كل الأعمال', path: '/works/all' },
+          { name: 'أعمال مميزة', path: '/works' },
+          { name: 'جميع الأعمال', path: '/works/all' },
         ])}
       />
       <Suspense

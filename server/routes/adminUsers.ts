@@ -6,15 +6,15 @@ import {
   allocateUniqueUsername,
   ensureAdminUsernames,
   generateRandomPassword,
-  isValidUsername,
   normalizeUsername,
   serializeAdminUser,
+  usernameFromEmail,
   writeAdminAuditLog,
 } from '../utils/adminUsers'
 
 const router = Router()
 
-router.get('/', requireAuth, async (_req, res) => {
+router.get('/', requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
     await ensureAdminUsernames()
     const [users, config, auditLogs] = await Promise.all([
@@ -53,11 +53,13 @@ router.get('/', requireAuth, async (_req, res) => {
 
 router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const { email, nameAr = '', nameEn = '', username } = req.body as {
+    const { email, nameAr = '', nameEn = '', username, password, jobTitle } = req.body as {
       email?: string
       nameAr?: string
       nameEn?: string
       username?: string
+      password?: string
+      jobTitle?: string
     }
 
     const normalizedEmail = email?.trim().toLowerCase()
@@ -72,26 +74,12 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
       return
     }
 
-    const preferredUsername = normalizeUsername(username || '')
-    if (!preferredUsername || !isValidUsername(preferredUsername)) {
-      res.status(400).json({
-        ok: false,
-        error: 'اسم المستخدم غير صالح (3–32 حرفاً: a-z و0-9 و . _ -)',
-      })
-      return
-    }
+    const title = jobTitle?.trim() || 'مسؤول لوحة التحكم'
+    const preferredUsername = normalizeUsername(username || usernameFromEmail(normalizedEmail))
 
     const existing = await prisma.adminUser.findUnique({ where: { email: normalizedEmail } })
     if (existing) {
       res.status(409).json({ ok: false, error: 'هذا البريد مستخدم مسبقاً' })
-      return
-    }
-
-    const existingUsername = await prisma.adminUser.findUnique({
-      where: { username: preferredUsername },
-    })
-    if (existingUsername) {
-      res.status(409).json({ ok: false, error: 'اسم المستخدم مستخدم مسبقاً' })
       return
     }
 
@@ -101,7 +89,13 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
       return
     }
 
-    const plainPassword = generateRandomPassword(12)
+    const customPassword = password?.trim()
+    if (customPassword && customPassword.length < 8) {
+      res.status(400).json({ ok: false, error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' })
+      return
+    }
+
+    const plainPassword = customPassword || generateRandomPassword(12)
     const passwordHash = await bcrypt.hash(plainPassword, 10)
     const uniqueUsername = await allocateUniqueUsername(preferredUsername)
 
@@ -113,6 +107,7 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
         nameAr: name,
         nameEn: nameEn.trim() || name,
         role: 'admin',
+        jobTitle: title,
         status: 'active',
       },
     })
@@ -123,7 +118,7 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
       actorRole: req.user?.role ?? '',
       targetUserId: user.id,
       targetEmail: user.email,
-      details: `إنشاء حساب مسؤول — ${user.username}`,
+      details: `إنشاء موظف — ${title} — ${user.username}`,
     })
 
     res.json({

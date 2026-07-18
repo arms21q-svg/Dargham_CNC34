@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSiteData } from '../context/SiteDataContext'
 import OptimizedImage from './OptimizedImage'
 
@@ -8,10 +8,23 @@ interface HeroSliderProps {
   side?: boolean
 }
 
+const SWIPE_THRESHOLD = 40
+
 export default function HeroSlider({ side = false }: HeroSliderProps) {
   const { siteData } = useSiteData()
   const slideImages = siteData.home.slideImages
   const [current, setCurrent] = useState(0)
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+  const ignoreSwipe = useRef(false)
+
+  const goNext = useCallback(() => {
+    setCurrent((prev) => (prev + 1) % slideImages.length)
+  }, [slideImages.length])
+
+  const goPrev = useCallback(() => {
+    setCurrent((prev) => (prev - 1 + slideImages.length) % slideImages.length)
+  }, [slideImages.length])
 
   useEffect(() => {
     if (slideImages.length <= 1) return
@@ -22,7 +35,7 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
     const tick = () => {
       timer = setTimeout(() => {
         if (cancelled) return
-        setCurrent((prev) => (prev + 1) % slideImages.length)
+        goNext()
         tick()
       }, 4500)
     }
@@ -32,7 +45,46 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [slideImages.length])
+  }, [slideImages.length, goNext, current])
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    if (!touch) return
+    touchStartX.current = touch.clientX
+    touchStartY.current = touch.clientY
+    ignoreSwipe.current = false
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current == null || touchStartY.current == null) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const dx = Math.abs(touch.clientX - touchStartX.current)
+    const dy = Math.abs(touch.clientY - touchStartY.current)
+    // Prefer vertical page scroll when gesture is mostly vertical
+    if (dy > dx && dy > 12) ignoreSwipe.current = true
+  }
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (slideImages.length <= 1) return
+    if (ignoreSwipe.current || touchStartX.current == null) {
+      touchStartX.current = null
+      touchStartY.current = null
+      return
+    }
+
+    const touch = e.changedTouches[0]
+    if (!touch) return
+    const deltaX = touch.clientX - touchStartX.current
+    touchStartX.current = null
+    touchStartY.current = null
+
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return
+
+    // Swipe left → next, swipe right → previous (natural finger navigation)
+    if (deltaX < 0) goNext()
+    else goPrev()
+  }
 
   if (slideImages.length === 0) {
     return (
@@ -55,11 +107,14 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
 
   return (
     <div
-      className={`relative w-full overflow-hidden ${
+      className={`relative w-full touch-pan-y overflow-hidden ${
         side
           ? 'h-full min-h-[360px] rounded-3xl shadow-xl ring-1 ring-black/5 sm:min-h-[420px] lg:min-h-[520px]'
           : 'h-[50vh] min-h-[320px] max-h-[600px] sm:h-[60vh]'
       }`}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
       {slideImages.map((src, i) => {
         if (!visible.has(i)) return null
@@ -79,7 +134,8 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
               sizes={side ? '(max-width: 1024px) 100vw, 50vw' : '100vw'}
               widths={[640, 900, 1200]}
               priority={i === 0}
-              className="h-full w-full object-cover"
+              className="pointer-events-none h-full w-full select-none object-cover"
+              draggable={false}
             />
           </div>
         )

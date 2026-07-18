@@ -321,7 +321,6 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
               }`}
             >
               {msg.imagePreview && (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={msg.imagePreview}
                   alt=""
@@ -370,7 +369,6 @@ export default function AiChatPanel({ open, onClose }: AiChatPanelProps) {
       {pendingImage && (
         <div className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">
           <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={pendingImage.preview} alt="" className="h-14 w-14 rounded-lg object-cover" />
             <p className="flex-1 text-xs text-gray-500 dark:text-gray-400">
               {lang === 'ar' ? 'صورة جاهزة للإرسال' : 'Image ready to send'}

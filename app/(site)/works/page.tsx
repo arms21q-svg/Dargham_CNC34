@@ -6,9 +6,8 @@ import { breadcrumbSchema, buildPageMetadata, DEFAULT_OG_IMAGE } from '@/lib/seo
 
 export const metadata: Metadata = buildPageMetadata({
   path: '/works',
-  title: 'أعمالنا',
-  description:
-    'معرض أعمال ضرغام CNC — جداريات وأبواب وديكور خشبي بتقنية CNC، مع بحث بالصورة والذكاء الاصطناعي.',
+  title: 'أعمال مميزة',
+  description: 'أعمال مميزة من ضرغام CNC — جداريات وأبواب وديكور خشبي بتقنية CNC.',
   image: DEFAULT_OG_IMAGE,
 })
 
@@ -18,7 +17,7 @@ export default function Page() {
       <JsonLd
         data={breadcrumbSchema([
           { name: 'الرئيسية', path: '/' },
-          { name: 'أعمالنا', path: '/works' },
+          { name: 'أعمال مميزة', path: '/works' },
         ])}
       />
       <Suspense

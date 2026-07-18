@@ -7,24 +7,33 @@ export const DEFAULT_ADMIN_PASSWORD = 'dorgham2026'
 export const DEFAULT_ABOUT_IMAGE =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80'
 
+/** Kept for DB/API compatibility; About page is no longer public. */
 export function createDefaultAboutSettings(): AboutSettings {
-  const ar = translations.ar.about
-  const en = translations.en.about
-
   return {
-    title: { ar: ar.title, en: en.title },
-    subtitle: { ar: ar.subtitle, en: en.subtitle },
-    story: { ar: ar.story, en: en.story },
-    storyText: { ar: ar.storyText, en: en.storyText },
-    mission: { ar: ar.mission, en: en.mission },
-    missionText: { ar: ar.missionText, en: en.missionText },
-    vision: { ar: ar.vision, en: en.vision },
-    visionText: { ar: ar.visionText, en: en.visionText },
+    title: { ar: 'من نحن', en: 'About Us' },
+    subtitle: { ar: 'قصة شغف بالخشب والإبداع', en: 'A story of passion for wood and creativity' },
+    story: { ar: 'قصتنا', en: 'Our Story' },
+    storyText: {
+      ar: 'بدأت رحلة ضرغام CNC من شغف عميق بفن النحت على الخشب في العراق.',
+      en: 'Dorgham CNC began from a deep passion for wood carving art in Iraq.',
+    },
+    mission: { ar: 'مهمتنا', en: 'Our Mission' },
+    missionText: {
+      ar: 'تقديم تصاميم خشبية استثنائية تجمع بين الجمال والوظيفة.',
+      en: 'To deliver exceptional wooden designs that blend beauty and functionality.',
+    },
+    vision: { ar: 'رؤيتنا', en: 'Our Vision' },
+    visionText: {
+      ar: 'أن نكون الخيار الأول لعشاق التصاميم الخشبية الفاخرة في العراق.',
+      en: 'To be the first choice for premium wooden design enthusiasts in the region.',
+    },
     image: DEFAULT_ABOUT_IMAGE,
-    stats: ar.stats.map((stat, i) => ({
-      value: stat.value,
-      label: { ar: stat.label, en: en.stats[i]?.label ?? stat.label },
-    })),
+    stats: [
+      { value: '+500', label: { ar: 'مشروع منجز', en: 'Projects Done' } },
+      { value: '+8', label: { ar: 'سنوات خبرة', en: 'Years Experience' } },
+      { value: '98%', label: { ar: 'رضا العملاء', en: 'Client Satisfaction' } },
+      { value: '+50', label: { ar: 'تصميم حصري', en: 'Exclusive Designs' } },
+    ],
   }
 }
 

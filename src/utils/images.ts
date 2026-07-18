@@ -39,12 +39,3 @@ export function imageSrcSet(
     .map((w) => `${optimizeImageUrl(url, { width: w, quality })} ${w}w`)
     .join(', ')
 }
-
-/** Warm cache without <link rel="preload"> (avoids unused-preload warnings with next/image). */
-export function preloadImage(url: string, opts: ImageOpts = {}) {
-  if (typeof document === 'undefined' || !url) return
-  const href = optimizeImageUrl(url, opts)
-  const img = new window.Image()
-  img.decoding = 'async'
-  img.src = href
-}

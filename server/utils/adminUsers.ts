@@ -51,6 +51,7 @@ export function serializeAdminUser(user: {
   role: string
   nameAr: string
   nameEn: string
+  jobTitle?: string | null
   status: string
   createdAt: Date
 }) {
@@ -61,6 +62,7 @@ export function serializeAdminUser(user: {
     role: user.role,
     nameAr: user.nameAr,
     nameEn: user.nameEn,
+    jobTitle: user.jobTitle?.trim() || '',
     status: user.status === 'disabled' ? 'disabled' : 'active',
     createdAt: user.createdAt.toISOString(),
   }

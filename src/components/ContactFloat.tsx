@@ -47,7 +47,10 @@ export default function ContactFloat() {
   if (links.length === 0 && !aiEnabled) return null
 
   return (
-    <div ref={rootRef} className="fixed bottom-5 start-5 z-50 flex flex-col items-center gap-3">
+    <div
+      ref={rootRef}
+      className="fixed bottom-[5.5rem] start-5 z-50 flex flex-col items-center gap-3 md:bottom-5"
+    >
       {aiOpen && (
         <Suspense fallback={null}>
           <AiChatPanel open={aiOpen} onClose={() => setAiOpen(false)} />

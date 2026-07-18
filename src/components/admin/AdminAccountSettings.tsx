@@ -12,6 +12,7 @@ import {
   type AdminAuditLogRecord,
   type AdminUserRecord,
 } from '../../utils/adminUsersApi'
+import { EMPLOYEE_JOB_ROLES, generateEmployeePassword } from '../../utils/employeeAccounts'
 
 interface AdminAccountSettingsProps {
   compact?: boolean
@@ -22,6 +23,7 @@ interface RevealedCredentials {
   email: string
   username: string
   password: string
+  jobTitle?: string
   reason: 'create' | 'reset'
 }
 
@@ -33,8 +35,9 @@ const ACTION_LABELS: Record<string, string> = {
   'user.status_change': 'تغيير الحالة',
 }
 
-function roleLabel(role: string) {
-  return role === 'super' ? 'مدير رئيسي' : 'مسؤول'
+function accountTypeLabel(user: AdminUserRecord) {
+  if (user.role === 'super') return 'مدير رئيسي'
+  return user.jobTitle?.trim() || 'مسؤول'
 }
 
 function statusLabel(status: string) {
@@ -62,8 +65,9 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
   const [nameAr, setNameAr] = useState('')
-  const [username, setUsername] = useState('')
   const [newUserEmail, setNewUserEmail] = useState('')
+  const [password, setPassword] = useState(() => generateEmployeePassword())
+  const [jobTitle, setJobTitle] = useState<string>(EMPLOYEE_JOB_ROLES[0].value)
   const [creating, setCreating] = useState(false)
   const [revealed, setRevealed] = useState<RevealedCredentials | null>(null)
   const [resetTarget, setResetTarget] = useState<AdminUserRecord | null>(null)
@@ -97,13 +101,13 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
   if (compact) {
     return (
       <div className="card p-5">
-        <h2 className="mb-2 font-semibold text-gray-800 dark:text-gray-100">حسابات المستخدمين</h2>
+        <h2 className="mb-2 font-semibold text-gray-800 dark:text-gray-100">إدارة الموظفين</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">المدير: {currentEmail}</p>
         <a
-          href="/admin/managers"
+          href="/admin/employees"
           className="mt-3 inline-block text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
         >
-          إدارة الحسابات →
+          فتح إدارة الموظفين →
         </a>
       </div>
     )
@@ -112,18 +116,22 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
   const handleCreateUser = async () => {
     const email = newUserEmail.trim().toLowerCase()
     const name = nameAr.trim()
-    const userName = username.trim().toLowerCase()
+    const plainPassword = password.trim()
 
     if (!name) {
-      alert('أدخل الاسم')
-      return
-    }
-    if (!userName || userName.length < 3) {
-      alert('أدخل اسم مستخدم صالحاً (3 أحرف على الأقل)')
+      alert('أدخل اسم الموظف')
       return
     }
     if (!email.includes('@')) {
       alert('أدخل بريداً إلكترونياً صالحاً')
+      return
+    }
+    if (plainPassword.length < 8) {
+      alert('كلمة المرور يجب أن تكون 8 أحرف على الأقل')
+      return
+    }
+    if (!jobTitle.trim()) {
+      alert('اختر نوع الوظيفة')
       return
     }
 
@@ -132,8 +140,9 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
     try {
       const result = await createAdminUser({
         email,
-        username: userName,
         nameAr: name,
+        password: plainPassword,
+        jobTitle: jobTitle.trim(),
       })
 
       if (!result.ok || !result.user || !result.password) {
@@ -146,11 +155,13 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
         email: result.user.email,
         username: result.user.username,
         password: result.password,
+        jobTitle: result.user.jobTitle || jobTitle,
         reason: 'create',
       })
       setNameAr('')
-      setUsername('')
       setNewUserEmail('')
+      setPassword(generateEmployeePassword())
+      setJobTitle(EMPLOYEE_JOB_ROLES[0].value)
       await loadUsers()
     } catch {
       alert('تعذر إنشاء الحساب')
@@ -254,9 +265,12 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
       `الاسم: ${creds.name}`,
       `البريد الإلكتروني: ${creds.email}`,
       `اسم المستخدم: ${creds.username}`,
+      creds.jobTitle ? `نوع الوظيفة: ${creds.jobTitle}` : null,
       `كلمة المرور: ${creds.password}`,
       `رابط الدخول: https://www.dhirghamcnc.com/admin/login`,
-    ].join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     try {
       await navigator.clipboard.writeText(text)
@@ -270,15 +284,15 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
     <div className="space-y-6">
       <div className="card space-y-5 p-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">إنشاء حساب مستخدم</h2>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">إنشاء حساب موظف</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            أدخل الاسم واسم المستخدم والبريد — تُنشأ كلمة مرور عشوائية وتظهر مرة واحدة فقط
+            أدخل بيانات الموظف — كلمة المرور تُنشأ تلقائياً ويمكن إعادة توليدها قبل الحفظ
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="form-label">الاسم</label>
+            <label className="form-label">اسم الموظف</label>
             <input
               type="text"
               className="input-field"
@@ -288,38 +302,54 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
             />
           </div>
           <div>
-            <label className="form-label">اسم المستخدم</label>
-            <input
-              type="text"
-              className="input-field font-mono"
-              value={username}
-              onChange={(e) => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
-              placeholder="username"
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label className="form-label">البريد الإلكتروني</label>
+            <label className="form-label">البريد الإلكتروني (Email)</label>
             <input
               type="email"
               className="input-field"
               value={newUserEmail}
               onChange={(e) => setNewUserEmail(e.target.value)}
               placeholder="user@example.com"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  void handleCreateUser()
-                }
-              }}
             />
+          </div>
+          <div>
+            <label className="form-label">كلمة المرور (Password)</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="input-field font-mono"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setPassword(generateEmployeePassword())}
+                className="shrink-0 rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                Generate Password
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="form-label">نوع الوظيفة (Role)</label>
+            <select
+              className="input-field"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+            >
+              {EMPLOYEE_JOB_ROLES.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
         <button
           type="button"
           onClick={handleCreateUser}
-          disabled={creating || !newUserEmail.trim() || !nameAr.trim() || !username.trim()}
+          disabled={creating || !newUserEmail.trim() || !nameAr.trim() || password.trim().length < 8}
           className="btn-primary w-full sm:w-auto disabled:opacity-50"
         >
           {creating ? 'جاري الإنشاء...' : 'إنشاء الحساب'}
@@ -346,6 +376,14 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
                   {revealed.email}
                 </p>
               </div>
+              {revealed.jobTitle && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">نوع الوظيفة</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {revealed.jobTitle}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">اسم المستخدم</p>
                 <p className="break-all font-mono text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -395,7 +433,7 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
                   <th className="px-3 py-2 font-medium">الاسم</th>
                   <th className="px-3 py-2 font-medium">اسم المستخدم</th>
                   <th className="px-3 py-2 font-medium">البريد الإلكتروني</th>
-                  <th className="px-3 py-2 font-medium">نوع الحساب</th>
+                  <th className="px-3 py-2 font-medium">نوع الوظيفة</th>
                   <th className="px-3 py-2 font-medium">الحالة</th>
                   <th className="px-3 py-2 font-medium">تاريخ الإنشاء</th>
                   <th className="px-3 py-2 font-medium">إجراءات</th>
@@ -417,7 +455,7 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
                       {user.email}
                     </td>
                     <td className="px-3 py-3 text-gray-700 dark:text-gray-200">
-                      {roleLabel(user.role)}
+                      {accountTypeLabel(user)}
                     </td>
                     <td className="px-3 py-3">
                       <span

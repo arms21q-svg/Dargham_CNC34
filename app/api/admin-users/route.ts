@@ -4,9 +4,9 @@ import {
   allocateUniqueUsername,
   ensureAdminUsernames,
   generateRandomPassword,
-  isValidUsername,
   normalizeUsername,
   serializeAdminUser,
+  usernameFromEmail,
   writeAdminAuditLog,
 } from '@server/utils/adminUsers'
 import { readJsonBody, verifyBearerHeader } from '@server/vercelAuth'
@@ -23,6 +23,13 @@ export async function GET(req: NextRequest) {
     const auth = verifyBearerHeader(req.headers.get('authorization'))
     if (!auth) {
       return NextResponse.json({ ok: false, error: 'غير مصرح أو انتهت الجلسة' }, { status: 401 })
+    }
+
+    if (auth.role !== 'super') {
+      return NextResponse.json(
+        { ok: false, error: 'إدارة الموظفين للمدير الرئيسي فقط' },
+        { status: 403 }
+      )
     }
 
     await ensureAdminUsernames()
@@ -86,6 +93,7 @@ export async function POST(req: NextRequest) {
       username?: string
       nameAr?: string
       nameEn?: string
+      jobTitle?: string
       role?: string
       status?: string
       password?: string
@@ -215,27 +223,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'الاسم مطلوب' }, { status: 400 })
     }
 
-    const preferredUsername = normalizeUsername(body.username || '')
-    if (!preferredUsername || !isValidUsername(preferredUsername)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'اسم المستخدم غير صالح (3–32 حرفاً: a-z و0-9 و . _ -)',
-        },
-        { status: 400 }
-      )
-    }
+    const jobTitle = body.jobTitle?.trim() || 'مسؤول لوحة التحكم'
+
+    const preferredUsername = normalizeUsername(
+      body.username?.trim() || usernameFromEmail(normalizedEmail)
+    )
 
     const existingEmail = await prisma.adminUser.findUnique({ where: { email: normalizedEmail } })
     if (existingEmail) {
       return NextResponse.json({ ok: false, error: 'هذا البريد مستخدم مسبقاً' }, { status: 409 })
-    }
-
-    const existingUsername = await prisma.adminUser.findUnique({
-      where: { username: preferredUsername },
-    })
-    if (existingUsername) {
-      return NextResponse.json({ ok: false, error: 'اسم المستخدم مستخدم مسبقاً' }, { status: 409 })
     }
 
     const config = await prisma.siteConfig.findUnique({ where: { id: 1 } })
@@ -246,9 +242,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const role = body.role === 'super' ? 'admin' : 'admin'
+    const customPassword = body.password?.trim()
+    if (customPassword && customPassword.length < 8) {
+      return NextResponse.json(
+        { ok: false, error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' },
+        { status: 400 }
+      )
+    }
+
     const bcrypt = (await import('bcryptjs')).default
-    const plainPassword = generateRandomPassword(12)
+    const plainPassword = customPassword || generateRandomPassword(12)
     const passwordHash = await bcrypt.hash(plainPassword, 10)
     const username = await allocateUniqueUsername(preferredUsername)
 
@@ -259,7 +262,8 @@ export async function POST(req: NextRequest) {
         passwordHash,
         nameAr,
         nameEn: body.nameEn?.trim() || nameAr,
-        role,
+        role: 'admin',
+        jobTitle,
         status: 'active',
       },
     })
@@ -270,7 +274,7 @@ export async function POST(req: NextRequest) {
       actorRole: auth.role,
       targetUserId: user.id,
       targetEmail: user.email,
-      details: `إنشاء حساب ${roleLabel(user.role)} — ${user.username}`,
+      details: `إنشاء موظف — ${jobTitle} — ${user.username}`,
     })
 
     return NextResponse.json({

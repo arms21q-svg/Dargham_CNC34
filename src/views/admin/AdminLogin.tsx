@@ -54,9 +54,13 @@ export default function AdminLogin() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-950">
       <div className="card w-full max-w-md p-8">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600 text-2xl font-bold text-white">
-            D
-          </div>
+          <img
+            src="/logo.png"
+            alt="ضرغام CNC"
+            width={56}
+            height={56}
+            className="mx-auto mb-4 h-14 w-14 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+          />
           <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">لوحة التحكم</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             أدخل البريد أو اسم المستخدم وكلمة المرور

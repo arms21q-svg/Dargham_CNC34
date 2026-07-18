@@ -5,8 +5,6 @@ export interface Translations {
     home: string
     works: string
     allWorks: string
-    about: string
-    faq: string
     contact: string
     saved: string
   }
@@ -18,8 +16,6 @@ export interface Translations {
     ourWorks: string
     viewAll: string
     featuredWorks: string
-    whyUs: string
-    whyUsItems: string[]
   }
   works: {
     title: string
@@ -29,6 +25,17 @@ export interface Translations {
     categories: string
     search: string
     searchPlaceholder: string
+    searchByImage: string
+    uploadImage: string
+    takePhoto: string
+    analyzingImage: string
+    imageSearchHint: string
+    clearResults: string
+    similarity: string
+    previewImage: string
+    rotate: string
+    cropSquare: string
+    startImageSearch: string
     resultsCount: string
     noResults: string
     save: string
@@ -41,22 +48,6 @@ export interface Translations {
     category: string
     related: string
     filterAll: string
-  }
-  about: {
-    title: string
-    subtitle: string
-    story: string
-    storyText: string
-    mission: string
-    missionText: string
-    vision: string
-    visionText: string
-    stats: { value: string; label: string }[]
-  }
-  faq: {
-    title: string
-    subtitle: string
-    items: { q: string; a: string }[]
   }
   contact: {
     title: string
@@ -92,8 +83,6 @@ export const translations: Record<Lang, Translations> = {
       home: 'الرئيسية',
       works: 'أعمالنا',
       allWorks: 'جميع الأعمال',
-      about: 'من نحن',
-      faq: 'أسئلة شائعة',
       contact: 'تواصل معنا',
       saved: 'المحفوظات',
     },
@@ -106,13 +95,6 @@ export const translations: Record<Lang, Translations> = {
       ourWorks: 'أعمالنا',
       viewAll: 'عرض جميع الأعمال',
       featuredWorks: 'أعمال مميزة',
-      whyUs: 'لماذا ضرغام؟',
-      whyUsItems: [
-        'دقة نحت عالية بآلات CNC حديثة',
-        'تصميم مخصص حسب فكرتك أو صورتك',
-        'أخشاب طبيعية مختارة بعناية',
-        'التزام بمواعيد التسليم',
-      ],
     },
     works: {
       title: 'أعمالنا',
@@ -122,6 +104,17 @@ export const translations: Record<Lang, Translations> = {
       categories: 'التصنيفات',
       search: 'بحث',
       searchPlaceholder: 'ابحث عن تصميم...',
+      searchByImage: 'البحث بواسطة الصورة',
+      uploadImage: 'رفع من المعرض',
+      takePhoto: 'التقاط بالكاميرا',
+      analyzingImage: 'جاري تحليل الصورة...',
+      imageSearchHint: 'ارفع صورة أو التقطها للعثور على أقرب أعمال ضرغام CNC',
+      clearResults: 'مسح النتائج',
+      similarity: 'نسبة التشابه',
+      previewImage: 'معاينة الصورة',
+      rotate: 'تدوير',
+      cropSquare: 'قص مربع',
+      startImageSearch: 'ابحث بالصورة',
       resultsCount: 'نتيجة',
       noResults: 'لا توجد نتائج مطابقة',
       save: 'حفظ',
@@ -134,55 +127,6 @@ export const translations: Record<Lang, Translations> = {
       category: 'التصنيف',
       related: 'أعمال مشابهة',
       filterAll: 'الكل',
-    },
-    about: {
-      title: 'من نحن',
-      subtitle: 'قصة شغف بالخشب والإبداع',
-      story: 'قصتنا',
-      storyText:
-        'بدأت رحلة ضرغام CNC من شغف عميق بفن النحت على الخشب في العراق. نجمع بين الحرفية العراقية الأصيلة وتقنية CNC الحديثة لنقدم لك قطعاً فريدة تعكس ذوقك وتضيف لمسة فاخرة لمساحتك.',
-      mission: 'مهمتنا',
-      missionText:
-        'تقديم تصاميم خشبية استثنائية تجمع بين الجمال والوظيفة، مع الالتزام بأعلى معايير الجودة والدقة.',
-      vision: 'رؤيتنا',
-      visionText:
-        'أن نكون الخيار الأول لعشاق التصاميم الخشبية الفاخرة في العراق، مع الابتكار المستمر في التقنيات والتصاميم.',
-      stats: [
-        { value: '+500', label: 'مشروع منجز' },
-        { value: '+8', label: 'سنوات خبرة' },
-        { value: '98%', label: 'رضا العملاء' },
-        { value: '+50', label: 'تصميم حصري' },
-      ],
-    },
-    faq: {
-      title: 'أسئلة شائعة',
-      subtitle: 'إجابات على أكثر الأسئلة شيوعاً',
-      items: [
-        {
-          q: 'ما هي تقنية CNC؟',
-          a: 'CNC هي تقنية تحكم رقمي بالحاسوب تتيح نحت الخشب بدقة عالية جداً، مما يضمن تنفيذ التصاميم المعقدة بشكل مثالي.',
-        },
-        {
-          q: 'كم يستغرق تنفيذ الطلب؟',
-          a: 'يعتمد على حجم وتعقيد التصميم. عادةً من 5 إلى 21 يوم عمل. نزودك بجدول زمني واضح عند تأكيد الطلب.',
-        },
-        {
-          q: 'هل يمكنني تقديم تصميم خاص؟',
-          a: 'بالتأكيد! نقبل التصاميم المخصصة ونساعدك في تحويل فكرتك إلى واقع بتصميم ثلاثي الأبعاد قبل التنفيذ.',
-        },
-        {
-          q: 'ما أنواع الخشب المتوفرة؟',
-          a: 'نوفر مجموعة واسعة تشمل الجوز، الماهوجني، خشب الزان، عرعر، والخشب الصناعي حسب احتياجاتك.',
-        },
-        {
-          q: 'هل تقدمون خدمة التوصيل؟',
-          a: 'نعم، نوفر خدمة التوصيل والتركيب داخل بغداد وجميع المحافظات العراقية مع تغليف آمن لحماية المنتج.',
-        },
-        {
-          q: 'ما سياسة الضمان؟',
-          a: 'نقدم ضماناً لمدة سنة على جميع منتجاتنا ضد عيوب التصنيع، مع خدمة صيانة مجانية خلال أول 6 أشهر.',
-        },
-      ],
     },
     contact: {
       title: 'تواصل معنا',
@@ -216,8 +160,6 @@ export const translations: Record<Lang, Translations> = {
       home: 'Home',
       works: 'Our Works',
       allWorks: 'All Works',
-      about: 'About Us',
-      faq: 'FAQ',
       contact: 'Contact',
       saved: 'Saved',
     },
@@ -230,13 +172,6 @@ export const translations: Record<Lang, Translations> = {
       ourWorks: 'Our Works',
       viewAll: 'View All Works',
       featuredWorks: 'Featured Works',
-      whyUs: 'Why Dorgham?',
-      whyUsItems: [
-        'High-precision carving with modern CNC',
-        'Custom work from your idea or photo',
-        'Carefully selected natural woods',
-        'Reliable delivery timelines',
-      ],
     },
     works: {
       title: 'Our Works',
@@ -246,6 +181,17 @@ export const translations: Record<Lang, Translations> = {
       categories: 'Categories',
       search: 'Search',
       searchPlaceholder: 'Search for a design...',
+      searchByImage: 'Search by image',
+      uploadImage: 'Upload from gallery',
+      takePhoto: 'Take a photo',
+      analyzingImage: 'Analyzing image...',
+      imageSearchHint: 'Upload or capture a photo to find the closest Dorgham CNC works',
+      clearResults: 'Clear results',
+      similarity: 'Similarity',
+      previewImage: 'Image preview',
+      rotate: 'Rotate',
+      cropSquare: 'Square crop',
+      startImageSearch: 'Search with image',
       resultsCount: 'results',
       noResults: 'No matching results found',
       save: 'Save',
@@ -258,55 +204,6 @@ export const translations: Record<Lang, Translations> = {
       category: 'Category',
       related: 'Related Works',
       filterAll: 'All',
-    },
-    about: {
-      title: 'About Us',
-      subtitle: 'A story of passion for wood and creativity',
-      story: 'Our Story',
-      storyText:
-        'Dorgham CNC began from a deep passion for wood carving art in Iraq. We combine authentic Iraqi craftsmanship with modern CNC technology to deliver unique pieces that reflect your taste and add a luxurious touch to your space.',
-      mission: 'Our Mission',
-      missionText:
-        'To deliver exceptional wooden designs that blend beauty and functionality, while maintaining the highest standards of quality and precision.',
-      vision: 'Our Vision',
-      visionText:
-        'To be the first choice for premium wooden design enthusiasts in the region, with continuous innovation in techniques and designs.',
-      stats: [
-        { value: '500+', label: 'Projects Done' },
-        { value: '8+', label: 'Years Experience' },
-        { value: '98%', label: 'Client Satisfaction' },
-        { value: '50+', label: 'Exclusive Designs' },
-      ],
-    },
-    faq: {
-      title: 'FAQ',
-      subtitle: 'Answers to the most common questions',
-      items: [
-        {
-          q: 'What is CNC technology?',
-          a: 'CNC is Computer Numerical Control technology that enables wood carving with extreme precision, ensuring perfect execution of complex designs.',
-        },
-        {
-          q: 'How long does an order take?',
-          a: 'It depends on the size and complexity of the design. Typically 5 to 21 business days. We provide a clear timeline upon order confirmation.',
-        },
-        {
-          q: 'Can I submit a custom design?',
-          a: 'Absolutely! We accept custom designs and help you turn your idea into reality with a 3D preview before production.',
-        },
-        {
-          q: 'What types of wood are available?',
-          a: 'We offer a wide range including oak, walnut, mahogany, beech, and engineered wood based on your needs.',
-        },
-        {
-          q: 'Do you offer delivery service?',
-          a: 'Yes, we provide delivery and installation within and outside the city with secure packaging to protect your product.',
-        },
-        {
-          q: 'What is the warranty policy?',
-          a: 'We offer a one-year warranty on all products against manufacturing defects, with free maintenance during the first 6 months.',
-        },
-      ],
     },
     contact: {
       title: 'Contact Us',

@@ -15,13 +15,12 @@ const appDir = path.join(root, 'app')
 const sourceCandidates = [
   path.join(publicDir, 'logo-source.png'),
   path.join(
-    root,
-    '..',
+    process.env.USERPROFILE || '',
     '.cursor',
     'projects',
     'c-Users-H-Desktop-cnc2026',
     'assets',
-    'c__Users_H_AppData_Roaming_Cursor_User_workspaceStorage_021e285fa36c2410f79b84756920a283_images_logo_cnc-ac74e587-51c3-4d5c-aac1-6bd9918fa63c.png'
+    'c__Users_H_AppData_Roaming_Cursor_User_workspaceStorage_021e285fa36c2410f79b84756920a283_images_logo_cnc-e44453a5-1380-4018-a386-bd14652324d8.png'
   ),
 ]
 

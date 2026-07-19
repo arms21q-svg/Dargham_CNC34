@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import ProductCard from '../components/ProductCard'
 import WorksSearchBar, { type WorksImageSearchResult } from '../components/WorksSearchBar'
 import OptimizedImage from '../components/OptimizedImage'
-import { categoryLabels, type Product } from '../data/content'
+import type { Product } from '../data/content'
 import { searchProductsByText } from '../utils/productTextSearch'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
@@ -40,26 +40,18 @@ function SearchResultCard({
         </div>
       </Link>
       <div className="space-y-2 p-4">
-        <Link href={`/works/${product.id}`} prefetch>
-          <h3 className="font-semibold text-[#e8c547] md:text-gray-900 dark:md:text-gray-100">
-            {product.title[lang]}
-          </h3>
-        </Link>
-        <p className="line-clamp-2 text-sm text-white/70 md:text-gray-500 dark:md:text-gray-400">
-          {product.description[lang]}
-        </p>
-        <p className="text-xs font-medium text-white/50 md:text-gray-500">
-          {t.works.category}: {categoryLabels[lang][product.category]}
-        </p>
+        <h3 className="font-semibold text-[#e8c547] md:text-gray-900 dark:md:text-gray-100">
+          {product.title[lang]}
+        </h3>
         {typeof score === 'number' && (
-          <p className="text-xs font-semibold text-[#e8c547] md:text-primary-700 dark:md:text-primary-300">
+          <p className="text-xs font-semibold text-[#e8c547]">
             {t.works.similarity}: {score}%
           </p>
         )}
         <Link
           href={`/works/${product.id}`}
           prefetch
-          className="mt-1 inline-flex rounded-xl bg-[#c9a227] px-3 py-2 text-xs font-bold text-black transition hover:bg-[#d4b03a] md:bg-primary-600 md:text-white md:hover:bg-primary-700"
+          className="mt-1 inline-flex rounded-xl bg-[#c9a227] px-3 py-2 text-xs font-bold text-black"
         >
           {t.works.viewDetails}
         </Link>
@@ -115,7 +107,6 @@ export default function WorksPage() {
     return featuredProducts
   }, [imageSearch, imageResults, search, textHits, featuredProducts])
 
-  const showTextScores = Boolean(search.trim()) && !imageSearch
   const isImageMode = Boolean(imageSearch)
 
   return (
@@ -126,10 +117,7 @@ export default function WorksPage() {
             <h1 className="mb-2 text-3xl font-bold text-white md:mb-3 md:text-4xl md:text-gray-800 dark:md:text-gray-100">
               {t.works.featured}
             </h1>
-            <p className="mx-auto hidden max-w-2xl text-gray-500 md:block dark:text-gray-400">
-              {t.works.subtitle}
-            </p>
-            <div className="mx-auto mt-3 hidden h-1 w-16 rounded-full bg-primary-500 md:mt-4 md:block" />
+            <p className="hidden text-gray-500 md:block dark:text-gray-400">{t.works.subtitle}</p>
           </div>
 
           <div className="mb-5 md:mb-8">
@@ -143,39 +131,21 @@ export default function WorksPage() {
           </div>
 
           {(search.trim() || imageSearch) && (
-            <div
-              className={`mb-4 rounded-2xl px-4 py-3 text-sm md:mb-6 ${
-                imageSearch?.softMatch
-                  ? 'bg-amber-500/15 text-amber-100 md:bg-amber-50 md:text-amber-900 dark:md:bg-amber-950/40 dark:md:text-amber-100'
-                  : 'bg-[#c9a227]/15 text-[#e8c547] md:bg-primary-50 md:text-primary-800 dark:md:bg-primary-950 dark:md:text-primary-200'
-              }`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  {imageSearch
-                    ? lang === 'ar'
-                      ? 'نتائج من قاعدة البيانات — أعمال مشابهة'
-                      : 'Database results — similar works'
-                    : lang === 'ar'
-                      ? `نتائج البحث عن «${search.trim()}»`
-                      : `Results for “${search.trim()}”`}
-                </span>
-                <span className="font-semibold">
-                  {filtered.length} {t.works.resultsCount}
-                </span>
-              </div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm text-white md:bg-primary-50 md:text-primary-800 dark:md:bg-primary-950 dark:md:text-primary-200">
+              <span>
+                {imageSearch
+                  ? lang === 'ar'
+                    ? 'نتائج من قاعدة البيانات — أعمال مشابهة'
+                    : 'Database results — similar works'
+                  : lang === 'ar'
+                    ? `نتائج البحث عن «${search.trim()}»`
+                    : `Results for “${search.trim()}”`}
+              </span>
+              <span className="font-semibold">
+                {filtered.length} {t.works.resultsCount}
+              </span>
             </div>
           )}
-
-          <div className="mb-4 hidden md:mb-8 md:block">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-              {search.trim() || imageSearch
-                ? lang === 'ar'
-                  ? 'نتائج البحث'
-                  : 'Search results'
-                : t.works.featured}
-            </h2>
-          </div>
 
           {filtered.length === 0 ? (
             <div className="py-16 text-center">
@@ -189,7 +159,7 @@ export default function WorksPage() {
                     setSearch('')
                     setImageSearch(null)
                   }}
-                  className="mt-4 text-sm font-semibold text-[#e8c547] hover:underline md:text-primary-600"
+                  className="mt-4 text-sm font-semibold text-primary-400 hover:underline md:text-primary-600"
                 >
                   {t.works.clearResults}
                 </button>
@@ -213,7 +183,7 @@ export default function WorksPage() {
                   product={product}
                   catalogMobile
                   similarityScore={
-                    showTextScores ? textScoresById.get(product.id) : undefined
+                    search.trim() ? textScoresById.get(product.id) : undefined
                   }
                 />
               ))}
@@ -225,7 +195,7 @@ export default function WorksPage() {
               <Link
                 href="/works/all"
                 prefetch
-                className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/15 md:border-primary-200 md:bg-primary-50 md:text-primary-800 md:hover:bg-primary-100 dark:md:border-primary-800 dark:md:bg-primary-950 dark:md:text-primary-200"
+                className="inline-flex items-center justify-center rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-primary-700"
               >
                 {t.works.allWorks} →
               </Link>

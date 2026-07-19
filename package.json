@@ -2,6 +2,9 @@
   "name": "dorgham-cnc",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/safe-prisma-generate.mjs && next build",

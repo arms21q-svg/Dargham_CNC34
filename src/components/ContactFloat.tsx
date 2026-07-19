@@ -12,6 +12,20 @@ import {
 
 const AiChatPanel = lazy(() => import('./AiChatPanel'))
 
+function AiIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 3v2M12 19v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M3 12h2M19 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="4.25" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  )
+}
+
 export default function ContactFloat() {
   const { lang } = useApp()
   const { siteData } = useSiteData()
@@ -33,15 +47,20 @@ export default function ContactFloat() {
   useEffect(() => {
     if (!open && !aiOpen) return
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null
+      if (rootRef.current && target && !rootRef.current.contains(target)) {
         setOpen(false)
         setAiOpen(false)
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
   }, [open, aiOpen])
 
   if (links.length === 0 && !aiEnabled) return null
@@ -49,7 +68,7 @@ export default function ContactFloat() {
   return (
     <div
       ref={rootRef}
-      className="fixed bottom-[5.5rem] start-5 z-50 flex flex-col items-center gap-3 md:bottom-5"
+      className="fixed bottom-[calc(76px+env(safe-area-inset-bottom,0px)+12px)] start-4 z-[60] flex flex-col items-center gap-2.5 sm:start-5 md:bottom-5"
     >
       {aiOpen && (
         <Suspense fallback={null}>
@@ -57,9 +76,8 @@ export default function ContactFloat() {
         </Suspense>
       )}
 
-      {/* Circular link stack — neat, round buttons only */}
       {open && links.length > 0 && (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2.5">
           {links.map((link, index) => (
             <a
               key={link.id}
@@ -69,7 +87,7 @@ export default function ContactFloat() {
               onClick={() => setOpen(false)}
               title={link.label[lang]}
               aria-label={link.label[lang]}
-              className={`flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition-all duration-300 hover:scale-110 active:scale-95 ${getFloatLinkColor(link.icon)}`}
+              className={`flex h-12 w-12 items-center justify-center rounded-full text-white shadow-md transition-transform duration-200 hover:scale-105 active:scale-95 ${getFloatLinkColor(link.icon)}`}
               style={{
                 animation: `floatPop 0.28s ease-out ${index * 0.05}s both`,
               }}
@@ -80,7 +98,7 @@ export default function ContactFloat() {
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-2.5">
         {aiEnabled && (
           <button
             type="button"
@@ -91,11 +109,11 @@ export default function ContactFloat() {
             aria-expanded={aiOpen}
             aria-label={aiLabel}
             title={aiLabel}
-            className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-xl text-white shadow-lg shadow-violet-600/35 transition-all hover:scale-105 active:scale-95 ${
-              aiOpen ? 'ring-2 ring-violet-300 ring-offset-2 dark:ring-offset-gray-950' : ''
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-[#141414] text-[#e8c547] shadow-md transition-transform hover:scale-105 active:scale-95 ${
+              aiOpen ? 'ring-2 ring-[#c9a227] ring-offset-2 ring-offset-white' : ''
             }`}
           >
-            ✨
+            <AiIcon className="h-6 w-6" />
           </button>
         )}
 
@@ -109,8 +127,8 @@ export default function ContactFloat() {
             aria-expanded={open}
             aria-label={linksLabel}
             title={linksLabel}
-            className={`flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg shadow-primary-600/40 transition-all hover:scale-105 hover:bg-primary-700 active:scale-95 ${
-              open ? 'ring-2 ring-primary-300 ring-offset-2 dark:ring-offset-gray-950' : ''
+            className={`flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-md transition-transform hover:scale-105 hover:bg-primary-700 active:scale-95 ${
+              open ? 'ring-2 ring-primary-300 ring-offset-2 ring-offset-white' : ''
             }`}
           >
             {open ? (

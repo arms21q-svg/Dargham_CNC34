@@ -51,7 +51,7 @@ export default function PublicShell({ children }: { children: ReactNode }) {
         تخطي إلى المحتوى
       </a>
       <BrandSplash skip={false} />
-      <div className="flex min-h-screen flex-col pb-[4.75rem] md:pb-0">
+      <div className="flex min-h-screen flex-col pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-0">
         <Header />
         <main id="main-content" className="flex-1" tabIndex={-1}>
           <PageTransition>{children}</PageTransition>

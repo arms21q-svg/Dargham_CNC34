@@ -114,8 +114,8 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
 
     await writeAdminAuditLog({
       action: 'user.create',
-      actorEmail: req.user?.email ?? '',
-      actorRole: req.user?.role ?? '',
+      actorEmail: req.adminEmail ?? '',
+      actorRole: req.adminRole ?? '',
       targetUserId: user.id,
       targetEmail: user.email,
       details: `إنشاء موظف — ${title} — ${user.username}`,
@@ -135,7 +135,7 @@ router.post('/', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) =
 
 router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const { id } = req.params
+    const id = String(req.params.id || '')
     const user = await prisma.adminUser.findUnique({ where: { id } })
 
     if (!user) {
@@ -165,8 +165,8 @@ router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req: A
 
     await writeAdminAuditLog({
       action: customPassword ? 'user.set_password' : 'user.reset_password',
-      actorEmail: req.user?.email ?? '',
-      actorRole: req.user?.role ?? '',
+      actorEmail: req.adminEmail ?? '',
+      actorRole: req.adminRole ?? '',
       targetUserId: user.id,
       targetEmail: user.email,
       details: customPassword
@@ -188,7 +188,7 @@ router.post('/:id/reset-password', requireAuth, requireSuperAdmin, async (req: A
 
 router.delete('/:id', requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const { id } = req.params
+    const id = String(req.params.id || '')
     const user = await prisma.adminUser.findUnique({ where: { id } })
 
     if (!user) {
@@ -204,8 +204,8 @@ router.delete('/:id', requireAuth, requireSuperAdmin, async (req: AuthRequest, r
     await prisma.adminUser.delete({ where: { id } })
     await writeAdminAuditLog({
       action: 'user.delete',
-      actorEmail: req.user?.email ?? '',
-      actorRole: req.user?.role ?? '',
+      actorEmail: req.adminEmail ?? '',
+      actorRole: req.adminRole ?? '',
       targetUserId: user.id,
       targetEmail: user.email,
       details: 'حذف حساب مسؤول',

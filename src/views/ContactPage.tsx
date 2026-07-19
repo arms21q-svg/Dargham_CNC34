@@ -4,14 +4,14 @@ import { useState, type FormEvent } from 'react'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 import SocialLinks from '../components/SocialLinks'
-import { getContactFormWhatsAppUrl, getWhatsAppUrl, openWhatsApp, normalizeWhatsAppPhone } from '../utils/siteDataStorage'
+import { getContactFormWhatsAppUrl, openWhatsApp, normalizeWhatsAppPhone } from '../utils/siteDataStorage'
 
 const emptyForm = { name: '', email: '', phone: '', message: '' }
 
 export default function ContactPage() {
   const { lang, t } = useApp()
   const { siteData } = useSiteData()
-  const { contact, managers } = siteData
+  const { contact } = siteData
   const [form, setForm] = useState(emptyForm)
   const [sent, setSent] = useState(false)
 
@@ -72,50 +72,6 @@ export default function ContactPage() {
               </a>
             </div>
 
-            {managers.length > 0 && (
-              <div className="card p-6">
-                <h3 className="mb-4 font-semibold">
-                  {lang === 'ar' ? 'المسؤولين' : 'Our Team'}
-                </h3>
-                <div className="space-y-4">
-                  {managers.map((manager) => (
-                    <div
-                      key={manager.id}
-                      className="rounded-xl bg-gray-50 p-4 dark:bg-gray-800/50"
-                    >
-                      <h4 className="font-semibold text-gray-800 dark:text-gray-100">
-                        {manager.name[lang]}
-                      </h4>
-                      <p className="text-sm text-primary-600 dark:text-primary-400">
-                        {manager.role[lang]}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-3">
-                        <a
-                          href={`tel:${manager.phone}`}
-                          className="text-sm text-gray-600 hover:text-primary-600 dark:text-gray-300"
-                        >
-                          {manager.phone}
-                        </a>
-                        {manager.whatsapp && (
-                          <a
-                            href={getWhatsAppUrl(
-                              { ...contact, whatsapp: manager.whatsapp },
-                              lang
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-[#25D366] hover:underline"
-                          >
-                            WhatsApp
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="card p-6">
               <h3 className="mb-4 font-semibold">{t.contact.followUs}</h3>
               <SocialLinks />
@@ -166,10 +122,10 @@ export default function ContactPage() {
                   <label className="form-label">{t.contact.email}</label>
                   <input
                     type="email"
-                    required
                     className="input-field"
                     value={form.email}
                     onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    autoComplete="email"
                   />
                 </div>
                 <div>

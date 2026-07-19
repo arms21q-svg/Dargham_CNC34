@@ -87,7 +87,7 @@ model Product {
   sortOrder     Int      @default(0)
   /** 64-bit average-hash hex for near-exact visual match */
   imageHash     String?
-  /** Compact RGB vector (12x12x3) for cosine visual similarity */
+  /** Compact RGB vector (12x12x3 = 432) mirrored to pgvector `embedding` via raw SQL */
   imageVector   Json?
   indexedAt     DateTime?
   createdAt     DateTime @default(now())

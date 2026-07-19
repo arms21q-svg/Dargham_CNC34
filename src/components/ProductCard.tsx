@@ -29,6 +29,7 @@ function ProductCard({
         {/* Mobile / phone: 2-col catalog tiles */}
         <Link
           href={`/works/${product.id}`}
+          prefetch
           className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414] text-center shadow-sm md:hidden"
         >
           <div className="relative aspect-square w-full overflow-hidden bg-black/40">
@@ -55,7 +56,7 @@ function ProductCard({
 
         {/* Tablet / desktop: existing card */}
         <div className="card-hover group hidden overflow-hidden content-visibility-auto md:block">
-          <Link href={`/works/${product.id}`} className="block">
+          <Link href={`/works/${product.id}`} prefetch className="block">
             <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
               <OptimizedImage
                 src={product.image}
@@ -74,7 +75,7 @@ function ProductCard({
           </Link>
 
           <div className="p-4">
-            <Link href={`/works/${product.id}`}>
+            <Link href={`/works/${product.id}`} prefetch>
               <h3 className="mb-1 font-semibold text-gray-800 transition-colors group-hover:text-primary-600 dark:text-gray-100">
                 {product.title[lang]}
               </h3>
@@ -129,7 +130,7 @@ function ProductCard({
 
   return (
     <div className="card-hover group overflow-hidden content-visibility-auto">
-      <Link href={`/works/${product.id}`} className="block">
+      <Link href={`/works/${product.id}`} prefetch className="block">
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
           <OptimizedImage
             src={product.image}
@@ -148,7 +149,7 @@ function ProductCard({
       </Link>
 
       <div className="p-4">
-        <Link href={`/works/${product.id}`}>
+        <Link href={`/works/${product.id}`} prefetch>
           <h3 className="mb-1 font-semibold text-gray-800 transition-colors group-hover:text-primary-600 dark:text-gray-100">
             {product.title[lang]}
           </h3>

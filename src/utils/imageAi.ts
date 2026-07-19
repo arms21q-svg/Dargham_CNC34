@@ -8,7 +8,8 @@ export interface PreparedImage {
   dataUrl: string
 }
 
-export async function prepareImageFile(file: File, maxWidth = 900, quality = 0.85): Promise<PreparedImage> {
+/** Fast resize for DB visual search — keep payload tiny. */
+export async function prepareImageFile(file: File, maxWidth = 480, quality = 0.78): Promise<PreparedImage> {
   if (!file.type.startsWith('image/')) {
     throw new Error('يرجى اختيار ملف صورة')
   }
@@ -18,7 +19,7 @@ export async function prepareImageFile(file: File, maxWidth = 900, quality = 0.8
   }
 
   const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, maxWidth / bitmap.width)
+  const scale = Math.min(1, maxWidth / Math.max(bitmap.width, bitmap.height))
   const width = Math.max(1, Math.round(bitmap.width * scale))
   const height = Math.max(1, Math.round(bitmap.height * scale))
 
@@ -35,15 +36,14 @@ export async function prepareImageFile(file: File, maxWidth = 900, quality = 0.8
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
 
-  const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
-  const dataUrl = canvas.toDataURL(mimeType, quality)
+  const dataUrl = canvas.toDataURL('image/jpeg', quality)
   const base64 = dataUrl.split(',')[1] ?? ''
 
   if (!base64) {
     throw new Error('تعذر تحويل الصورة')
   }
 
-  return { base64, mimeType, dataUrl }
+  return { base64, mimeType: 'image/jpeg', dataUrl }
 }
 
 export interface ImageSearchMatch {
@@ -54,17 +54,9 @@ export interface ImageSearchMatch {
 export interface ImageSearchApiResult {
   productIds: string[]
   matches: ImageSearchMatch[]
-  analysis?: {
-    workType?: string
-    materials?: string[]
-    design?: string
-    techniques?: string[]
-    summary?: string
-    tags?: string[]
-  } | null
   softMatch?: boolean
-  analysisNote?: string
   mode: string
+  ms?: number
 }
 
 export async function searchProductsByImage(
@@ -72,7 +64,22 @@ export async function searchProductsByImage(
   lang: 'ar' | 'en',
   signal?: AbortSignal
 ): Promise<ImageSearchApiResult | null> {
-  const { base64, mimeType } = await prepareImageFile(file, 1024, 0.88)
+  // processImageForSearch already outputs ~480px JPEG — avoid a second canvas pass
+  let base64: string
+  let mimeType: string
+  if (file.type === 'image/jpeg' && file.size > 0 && file.size < 220_000 && file.name === 'search.jpg') {
+    const buf = await file.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    let binary = ''
+    const chunk = 0x8000
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+    }
+    base64 = btoa(binary)
+    mimeType = 'image/jpeg'
+  } else {
+    ;({ base64, mimeType } = await prepareImageFile(file, 480, 0.78))
+  }
   const res = await fetch(apiUrl('/api/ai-search-by-image'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -86,10 +93,9 @@ export async function searchProductsByImage(
     ok?: boolean
     productIds?: string[]
     matches?: ImageSearchMatch[]
-    analysis?: ImageSearchApiResult['analysis']
     softMatch?: boolean
-    analysisNote?: string
     mode?: string
+    ms?: number
   }
 
   if (!json.ok) return null
@@ -102,10 +108,9 @@ export async function searchProductsByImage(
   return {
     productIds: matches.map((m) => m.id),
     matches,
-    analysis: json.analysis,
     softMatch: Boolean(json.softMatch),
-    analysisNote: json.analysisNote,
     mode: json.mode ?? 'unknown',
+    ms: json.ms,
   }
 }
 
@@ -135,7 +140,7 @@ export async function processImageForSearch(
     const swapped = rotation === 90 || rotation === 270
     const outW = swapped ? srcH : srcW
     const outH = swapped ? srcW : srcH
-    const maxSide = 1024
+    const maxSide = 480
     const scale = Math.min(1, maxSide / Math.max(outW, outH))
     const canvasW = Math.max(1, Math.round(outW * scale))
     const canvasH = Math.max(1, Math.round(outH * scale))
@@ -164,7 +169,7 @@ export async function processImageForSearch(
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error('تعذر تحويل الصورة'))),
         'image/jpeg',
-        0.88
+        0.78
       )
     })
 

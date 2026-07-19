@@ -74,7 +74,6 @@ export default function OptimizedImage({
       priority={priority}
       className={className}
       quality={priority ? 78 : 72}
-      unoptimized={!optimized.includes('unsplash.com') && !optimized.includes('imgix.net')}
     />
   )
 }

@@ -142,47 +142,7 @@
       ]
     }
   ],
-  "managers": [
-    {
-      "id": "1",
-      "name": {
-        "ar": "أحمد ضرغام",
-        "en": "Ahmad Dorgham"
-      },
-      "role": {
-        "ar": "المدير العام",
-        "en": "General Manager"
-      },
-      "phone": "07701234567",
-      "whatsapp": "9647701234567"
-    },
-    {
-      "id": "51a6d8e3-37b7-40e6-968a-a7e4ec429378",
-      "name": {
-        "ar": "ALI",
-        "en": ""
-      },
-      "role": {
-        "ar": "FGHJM",
-        "en": ""
-      },
-      "phone": "098765434567",
-      "whatsapp": ""
-    },
-    {
-      "id": "784fc9da-02a0-4a92-a2f4-0f4fe3d81932",
-      "name": {
-        "ar": "كامل",
-        "en": ""
-      },
-      "role": {
-        "ar": "علي",
-        "en": ""
-      },
-      "phone": "12345678989",
-      "whatsapp": ""
-    }
-  ],
+  "managers": [],
   "settings": {
     "adminEmail": "admin@dorghamcnc.com",
     "adminPassword": "dorgham2026"

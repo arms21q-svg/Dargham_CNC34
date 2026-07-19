@@ -10,44 +10,29 @@ import {
 import type { SiteData } from '../../src/types/siteData'
 import { requireAuth, type AuthRequest } from '../middleware/auth'
 import { syncSuperAdminFromConfig } from '../utils/adminUsers'
+import { scheduleProductImageReindex } from '../imageIndex'
+
 const router = Router()
+
+function sanitizePublicSiteData(data: SiteData): SiteData {
+  return {
+    ...data,
+    settings: {
+      ...data.settings,
+      adminEmail: '',
+      adminPassword: '',
+    },
+  }
+}
 
 async function fetchSiteData() {
   const [config, products, managers] = await Promise.all([
     prisma.siteConfig.findUnique({ where: { id: 1 } }),
     prisma.product.findMany({
       orderBy: { sortOrder: 'asc' },
-      select: {
-        id: true,
-        titleAr: true,
-        titleEn: true,
-        descriptionAr: true,
-        descriptionEn: true,
-        category: true,
-        image: true,
-        materialsAr: true,
-        materialsEn: true,
-        dimensionsAr: true,
-        dimensionsEn: true,
-        featured: true,
-        colors: true,
-        sortOrder: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     }),
     prisma.manager.findMany({
       orderBy: { sortOrder: 'asc' },
-      select: {
-        id: true,
-        nameAr: true,
-        nameEn: true,
-        roleAr: true,
-        roleEn: true,
-        phone: true,
-        whatsapp: true,
-        sortOrder: true,
-      },
     }),
   ])
 
@@ -63,7 +48,7 @@ router.get('/', async (_req, res) => {
       return
     }
     res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120')
-    res.json({ ok: true, data })
+    res.json({ ok: true, data: sanitizePublicSiteData(data) })
   } catch (error) {
     console.error('GET site-data error:', error)
     res.status(500).json({ ok: false, error: 'فشل تحميل البيانات' })
@@ -73,6 +58,13 @@ router.get('/', async (_req, res) => {
 router.put('/', requireAuth, async (req: AuthRequest, res) => {
   try {
     const body = req.body as SiteData
+    if (!body?.home || !body?.contact || !body?.settings) {
+      res.status(400).json({ ok: false, error: 'بيانات غير مكتملة' })
+      return
+    }
+    if (!Array.isArray(body.products)) body.products = []
+    if (!Array.isArray(body.managers)) body.managers = []
+
     const existing = await prisma.siteConfig.findUnique({ where: { id: 1 } })
 
     if (!existing) {
@@ -80,24 +72,65 @@ router.put('/', requireAuth, async (req: AuthRequest, res) => {
       return
     }
 
+    const isSuper = req.adminRole === 'super'
+    let adminEmail = existing.adminEmail
     let passwordHash = existing.adminPasswordHash
-    if (body.settings.adminPassword?.trim()) {
-      passwordHash = await bcrypt.hash(body.settings.adminPassword.trim(), 10)
+    let nextPassword: string | undefined
+
+    if (isSuper) {
+      const requestedEmail = body.settings.adminEmail?.trim().toLowerCase()
+      if (requestedEmail) adminEmail = requestedEmail
+      nextPassword = body.settings.adminPassword?.trim() || undefined
+      if (nextPassword) {
+        passwordHash = await bcrypt.hash(nextPassword, 10)
+      }
     }
+
+    body.settings.adminEmail = adminEmail
+    body.settings.adminPassword = ''
 
     const configData = configFromSiteData(body, passwordHash)
 
-    // Avoid interactive transactions (unreliable with Supabase pgbouncer)
+    const previousProducts = await prisma.product.findMany({
+      select: {
+        id: true,
+        image: true,
+        imageHash: true,
+        imageVector: true,
+        indexedAt: true,
+      },
+    })
+    const prevById = new Map(previousProducts.map((p) => [p.id, p]))
+
+    const products = body.products.map((p, i) => {
+      const base = productFromSiteData(p, i)
+      const prev = prevById.get(base.id)
+      if (
+        prev &&
+        prev.image === base.image &&
+        prev.imageHash &&
+        prev.imageVector &&
+        prev.indexedAt
+      ) {
+        return {
+          ...base,
+          imageHash: prev.imageHash,
+          imageVector: prev.imageVector,
+          indexedAt: prev.indexedAt,
+        }
+      }
+      return base
+    })
+    const needsReindex = products.filter((p) => !('imageHash' in p && p.imageHash)).map((p) => p.id)
+
     await prisma.siteConfig.update({
       where: { id: 1 },
       data: configData,
     })
     await prisma.product.deleteMany()
     await prisma.manager.deleteMany()
-    if (body.products.length > 0) {
-      await prisma.product.createMany({
-        data: body.products.map((p, i) => productFromSiteData(p, i)),
-      })
+    if (products.length > 0) {
+      await prisma.product.createMany({ data: products })
     }
     if (body.managers.length > 0) {
       await prisma.manager.createMany({
@@ -105,13 +138,18 @@ router.put('/', requireAuth, async (req: AuthRequest, res) => {
       })
     }
 
-    await syncSuperAdminFromConfig(
-      body.settings.adminEmail,
-      body.settings.adminPassword?.trim() || undefined
-    )
+    if (isSuper) {
+      await syncSuperAdminFromConfig(adminEmail, nextPassword)
+    }
+
+    scheduleProductImageReindex(needsReindex.length ? needsReindex : undefined)
 
     const data = await fetchSiteData()
-    res.json({ ok: true, message: 'تم النشر على قاعدة البيانات', data })
+    res.json({
+      ok: true,
+      message: 'تم النشر على قاعدة البيانات',
+      data: data ? sanitizePublicSiteData(data) : data,
+    })
   } catch (error) {
     console.error('PUT site-data error:', error)
     const message = error instanceof Error ? error.message : 'فشل حفظ البيانات'

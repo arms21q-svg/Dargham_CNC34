@@ -11,7 +11,6 @@ import {
 export interface WorksImageSearchResult {
   productIds: string[]
   matches: { id: string; score: number }[]
-  note?: string
   softMatch?: boolean
 }
 
@@ -34,13 +33,19 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    if (!open) {
+      // Keep pickers ready next open; only abort in-flight search
+      abortRef.current?.abort()
+      setLoading(false)
+    }
+  }, [open])
+
+  useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       abortRef.current?.abort()
     }
   }, [previewUrl])
-
-  if (!open) return null
 
   const resetLocal = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -53,6 +58,8 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
     if (cameraRef.current) cameraRef.current.value = ''
     if (galleryRef.current) galleryRef.current.value = ''
   }
+
+  if (!open) return null
 
   const onPickFile = (file: File | undefined) => {
     if (!file) return
@@ -77,6 +84,7 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
     abortRef.current = controller
 
     try {
+      // Single canvas pass (rotate/crop + shrink) — no second resize
       const processed = await processImageForSearch(sourceFile, { rotation, squareCrop })
       const apiResult: ImageSearchApiResult | null = await searchProductsByImage(
         processed,
@@ -96,14 +104,13 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
       onResult({
         productIds: apiResult.productIds,
         matches: apiResult.matches,
-        note: apiResult.analysisNote || apiResult.analysis?.summary,
         softMatch: apiResult.softMatch,
       })
       resetLocal()
       onClose()
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return
-      setError(lang === 'ar' ? 'تعذر تحليل الصورة. حاول مجدداً.' : 'Could not analyze the image. Try again.')
+      setError(lang === 'ar' ? 'تعذر البحث في قاعدة البيانات. حاول مجدداً.' : 'Database search failed. Try again.')
     } finally {
       setLoading(false)
     }

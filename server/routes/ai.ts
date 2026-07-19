@@ -5,20 +5,12 @@ import {
   callGemini,
   callOpenAiVision,
   ensureAiEnabled,
-  extractProductIds,
   handleAiChat,
   localImageAnalysis,
   parseImagePayload,
   type ChatMessage,
 } from '../aiCore'
-import {
-  analyzeImageStructured,
-  loadCatalogForLocal,
-  localTagRank,
-  searchProductsByImageEmbeddings,
-  type ImageAnalysis,
-  type ScoredMatch,
-} from '../vectorSearch'
+import { searchProductsByImageEmbeddings } from '../vectorSearch'
 
 const router = Router()
 
@@ -108,17 +100,9 @@ router.post('/analyze-image', async (req, res) => {
   }
 })
 
-function analysisToNote(analysis: ImageAnalysis | null, lang: 'ar' | 'en') {
-  if (!analysis) return undefined
-  const parts = [
-    analysis.workType,
-    analysis.materials.slice(0, 3).join(lang === 'ar' ? '، ' : ', '),
-    analysis.design,
-  ].filter(Boolean)
-  return parts.join(' · ') || analysis.summary || undefined
-}
-
+/** DB-only visual search — no Gemini, no analysis/workType. */
 router.post('/search-by-image', async (req, res) => {
+  const started = Date.now()
   const { lang = 'ar', imageBase64, mimeType } = req.body as {
     lang?: 'ar' | 'en'
     imageBase64?: string
@@ -134,96 +118,31 @@ router.post('/search-by-image', async (req, res) => {
   }
 
   try {
-    const gate = await ensureAiEnabled(replyLang)
-    if (!gate.ok) {
-      res.status(403).json({ ok: false, error: gate.error })
-      return
-    }
-
-    const geminiKey = process.env.GEMINI_API_KEY
-    let matches: ScoredMatch[] = []
-    let analysis: ImageAnalysis | null = null
-    let softMatch = true
-    let mode = 'local'
-
-    if (geminiKey) {
-      const embedded = await searchProductsByImageEmbeddings(
-        geminiKey,
-        image.imageBase64,
-        image.mimeType,
-        replyLang
-      )
-      if (embedded?.matches.length) {
-        matches = embedded.matches
-        analysis = embedded.analysis
-        softMatch = embedded.softMatch
-        mode = embedded.mode
-      }
-    }
-
-    if (matches.length === 0) {
-      const { context, products } = await buildSiteContext(replyLang)
-      const validIds = new Set(products.map((p) => p.id))
-      const searchPrompt =
-        replyLang === 'ar'
-          ? `طابق الصورة مع الكتالوج. أعد JSON array من ids فقط.\n${context}`
-          : `Match image to catalog. Return ONLY a JSON array of ids.\n${context}`
-
-      analysis =
-        analysis ||
-        (geminiKey
-          ? await analyzeImageStructured(geminiKey, image.imageBase64, image.mimeType, replyLang)
-          : null)
-
-      const openAiKey = process.env.OPENAI_API_KEY
-      let productIds: string[] = []
-
-      if (geminiKey) {
-        const result = await callGemini(geminiKey, searchPrompt, [], [
-          { inlineData: { mimeType: image.mimeType, data: image.imageBase64 } },
-          { text: replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?' },
-        ])
-        if (result.ok && result.text) {
-          productIds = extractProductIds(result.text, validIds)
-          mode = 'gemini-vision'
-        }
-      }
-
-      if (productIds.length === 0 && openAiKey) {
-        const reply = await callOpenAiVision(
-          openAiKey,
-          searchPrompt,
-          replyLang === 'ar' ? 'أقرب الأعمال؟' : 'Closest works?',
-          image.imageBase64,
-          image.mimeType
-        )
-        if (reply) {
-          productIds = extractProductIds(reply, validIds)
-          mode = 'openai-vision'
-        }
-      }
-
-      matches = productIds.map((id, i) => ({ id, score: Math.max(70, 98 - i * 4) }))
-
-      if (matches.length === 0 && analysis) {
-        matches = localTagRank(analysis, await loadCatalogForLocal())
-        mode = 'local-tags'
-      }
-      softMatch = matches.length === 0 || (matches[0]?.score ?? 0) < 58
-    }
-
+    const embedded = await searchProductsByImageEmbeddings(
+      null,
+      image.imageBase64,
+      image.mimeType,
+      replyLang
+    )
+    const matches = embedded?.matches ?? []
     res.json({
       ok: true,
       productIds: matches.map((m) => m.id),
       matches,
-      analysis,
-      softMatch,
-      analysisNote: analysisToNote(analysis, replyLang),
-      mode,
+      softMatch: embedded?.softMatch ?? true,
+      mode: embedded?.mode ?? 'db-empty',
+      ms: Date.now() - started,
     })
   } catch (error) {
     console.error('Search by image error:', error)
-    res.json({ ok: true, productIds: [], matches: [], softMatch: true, mode: 'local' })
+    res.json({
+      ok: true,
+      productIds: [],
+      matches: [],
+      softMatch: true,
+      mode: 'error',
+      ms: Date.now() - started,
+    })
   }
 })
 

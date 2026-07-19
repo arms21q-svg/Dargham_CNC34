@@ -16,6 +16,17 @@ export const runtime = 'nodejs'
 
 const MAX_BODY_CHARS = 3_500_000
 
+function sanitizePublicSiteData(data: SiteData): SiteData {
+  return {
+    ...data,
+    settings: {
+      ...data.settings,
+      adminEmail: '',
+      adminPassword: '',
+    },
+  }
+}
+
 async function fetchSiteData() {
   const [config, products, managers] = await Promise.all([
     prisma.siteConfig.findUnique({ where: { id: 1 } }),
@@ -43,10 +54,6 @@ function assertSiteData(body: SiteData) {
   }
   if (!Array.isArray(body.products)) body.products = []
   if (!Array.isArray(body.managers)) body.managers = []
-
-  if (!body.settings.adminEmail?.trim()) {
-    throw new Error('بريد المدير مطلوب')
-  }
 
   for (const [i, p] of body.products.entries()) {
     if (!p?.id) throw new Error(`منتج #${i + 1} بدون معرّف`)
@@ -83,7 +90,7 @@ export async function GET() {
       )
     }
     return NextResponse.json(
-      { ok: true, data },
+      { ok: true, data: sanitizePublicSiteData(data) },
       {
         headers: {
           'Cache-Control': 'public, max-age=30, stale-while-revalidate=120',
@@ -98,7 +105,8 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    if (!verifyBearerHeader(req.headers.get('authorization'))) {
+    const auth = verifyBearerHeader(req.headers.get('authorization'))
+    if (!auth) {
       return NextResponse.json({ ok: false, error: 'غير مصرح أو انتهت الجلسة' }, { status: 401 })
     }
 
@@ -110,16 +118,60 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'قاعدة البيانات غير مهيأة' }, { status: 404 })
     }
 
+    const isSuper = auth.role === 'super'
     const bcrypt = (await import('bcryptjs')).default
+
+    // Only super-admin may change login credentials via site-data publish
+    let adminEmail = existing.adminEmail
     let passwordHash = existing.adminPasswordHash
-    const nextPassword = body.settings.adminPassword?.trim()
-    if (nextPassword) {
-      passwordHash = await bcrypt.hash(nextPassword, 10)
+    let nextPassword: string | undefined
+
+    if (isSuper) {
+      const requestedEmail = body.settings.adminEmail?.trim().toLowerCase()
+      if (requestedEmail) adminEmail = requestedEmail
+      nextPassword = body.settings.adminPassword?.trim() || undefined
+      if (nextPassword) {
+        passwordHash = await bcrypt.hash(nextPassword, 10)
+      }
     }
 
+    body.settings.adminEmail = adminEmail
+    body.settings.adminPassword = ''
+
     const configData = configFromSiteData(body, passwordHash)
-    const products = body.products.map((p, i) => productFromSiteData(p, i))
+
+    const previousProducts = await prisma.product.findMany({
+      select: {
+        id: true,
+        image: true,
+        imageHash: true,
+        imageVector: true,
+        indexedAt: true,
+      },
+    })
+    const prevById = new Map(previousProducts.map((p) => [p.id, p]))
+
+    const products = body.products.map((p, i) => {
+      const base = productFromSiteData(p, i)
+      const prev = prevById.get(base.id)
+      if (
+        prev &&
+        prev.image === base.image &&
+        prev.imageHash &&
+        prev.imageVector &&
+        prev.indexedAt
+      ) {
+        return {
+          ...base,
+          imageHash: prev.imageHash,
+          imageVector: prev.imageVector as Prisma.InputJsonValue,
+          indexedAt: prev.indexedAt,
+        }
+      }
+      return base
+    })
     const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
+    const needsReindex = products.filter((p) => !('imageHash' in p && p.imageHash)).map((p) => p.id)
 
     try {
       await prisma.siteConfig.update({
@@ -142,18 +194,24 @@ export async function PUT(req: NextRequest) {
       throw dbError
     }
 
-    try {
-      const { syncSuperAdminFromConfig } = await import('@server/utils/adminUsers')
-      await syncSuperAdminFromConfig(body.settings.adminEmail, nextPassword || undefined)
-    } catch (syncErr) {
-      console.error('super admin sync skipped', syncErr)
+    if (isSuper) {
+      try {
+        const { syncSuperAdminFromConfig } = await import('@server/utils/adminUsers')
+        await syncSuperAdminFromConfig(adminEmail, nextPassword)
+      } catch (syncErr) {
+        console.error('super admin sync skipped', syncErr)
+      }
     }
 
-    // Rebuild visual search index for gallery image matching
-    scheduleProductImageReindex(products.map((p) => p.id))
+    // Reindex only products missing visual features (unchanged images keep vectors)
+    scheduleProductImageReindex(needsReindex.length ? needsReindex : undefined)
 
     const data = await fetchSiteData()
-    return NextResponse.json({ ok: true, message: 'تم النشر على قاعدة البيانات', data })
+    return NextResponse.json({
+      ok: true,
+      message: 'تم النشر على قاعدة البيانات',
+      data: data ? sanitizePublicSiteData(data) : data,
+    })
   } catch (error) {
     console.error('site-data PUT error', error)
     return NextResponse.json({ ok: false, error: errorMessage(error) }, { status: 500 })

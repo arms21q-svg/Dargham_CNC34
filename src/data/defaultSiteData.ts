@@ -69,15 +69,7 @@ export function createDefaultSiteData(): SiteData {
       },
     },
     products: JSON.parse(JSON.stringify(products)),
-    managers: [
-      {
-        id: '1',
-        name: { ar: 'أحمد ضرغام', en: 'Ahmad Dorgham' },
-        role: { ar: 'المدير العام', en: 'General Manager' },
-        phone: '07701234567',
-        whatsapp: '9647701234567',
-      },
-    ],
+    managers: [],
     settings: {
       adminEmail: DEFAULT_ADMIN_EMAIL,
       adminPassword: DEFAULT_ADMIN_PASSWORD,

@@ -2,11 +2,27 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../db'
+import { rateLimit } from '../rateLimit'
+
 const router = Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
 
+function expressClientIp(req: { headers: Record<string, unknown>; ip?: string }): string {
+  const xf = req.headers['x-forwarded-for']
+  if (typeof xf === 'string' && xf.trim()) return xf.split(',')[0]?.trim() || 'unknown'
+  if (Array.isArray(xf) && xf[0]) return String(xf[0]).split(',')[0]?.trim() || 'unknown'
+  return req.ip || 'unknown'
+}
+
 router.post('/login', async (req, res) => {
   try {
+    const limited = rateLimit(`express-login:${expressClientIp(req)}`, 8, 60_000)
+    if (!limited.ok) {
+      res.setHeader('Retry-After', String(limited.retryAfter))
+      res.status(429).json({ ok: false, error: 'Too many requests. Please try again later.' })
+      return
+    }
+
     const body = req.body as { email?: string; username?: string; password?: string }
     const loginId = (body.email || body.username || '').trim().toLowerCase()
     const { password } = body

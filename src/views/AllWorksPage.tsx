@@ -1,9 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import ProductCard from '../components/ProductCard'
-import { categoryLabels, type Category } from '../data/content'
+import WorksSearchBar, { type WorksImageSearchResult } from '../components/WorksSearchBar'
+import OptimizedImage from '../components/OptimizedImage'
+import { categoryLabels, type Category, type Product } from '../data/content'
 import { searchProductsByText } from '../utils/productTextSearch'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
@@ -18,20 +21,73 @@ const categories: (Category | 'all')[] = [
   'custom',
 ]
 
+function SearchResultCard({
+  product,
+  score,
+}: {
+  product: Product
+  score?: number
+}) {
+  const { lang, t } = useApp()
+
+  return (
+    <article className="overflow-hidden rounded-2xl border border-[#c9a227]/25 bg-[#141414] text-white shadow-sm md:border-gray-200 md:bg-white md:text-gray-900 dark:md:border-gray-800 dark:md:bg-gray-900 dark:md:text-gray-100">
+      <Link href={`/works/${product.id}`} prefetch className="block">
+        <div className="relative aspect-[4/3] overflow-hidden bg-black/40">
+          <OptimizedImage
+            src={product.image}
+            alt={product.title[lang]}
+            width={640}
+            widths={[320, 480, 640]}
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="h-full w-full object-cover"
+          />
+          {typeof score === 'number' && (
+            <span className="absolute start-3 top-3 rounded-full bg-[#c9a227] px-2.5 py-1 text-xs font-bold text-black shadow">
+              {score}%
+            </span>
+          )}
+        </div>
+      </Link>
+      <div className="space-y-2 p-4">
+        <h3 className="font-semibold text-[#e8c547] md:text-gray-900 dark:md:text-gray-100">
+          {product.title[lang]}
+        </h3>
+        {typeof score === 'number' && (
+          <p className="text-xs font-semibold text-[#e8c547]">
+            {t.works.similarity}: {score}%
+          </p>
+        )}
+        <Link
+          href={`/works/${product.id}`}
+          prefetch
+          className="mt-1 inline-flex rounded-xl bg-[#c9a227] px-3 py-2 text-xs font-bold text-black"
+        >
+          {t.works.viewDetails}
+        </Link>
+      </div>
+    </article>
+  )
+}
+
 export default function AllWorksPage() {
   const { lang, t } = useApp()
   const { siteData } = useSiteData()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [category, setCategory] = useState<Category | 'all'>('all')
+  const [imageSearch, setImageSearch] = useState<WorksImageSearchResult | null>(null)
 
-  const textHits = useMemo(() => {
-    const base =
-      category === 'all'
-        ? siteData.products
-        : siteData.products.filter((p) => p.category === category)
-    return searchProductsByText(base, search, lang)
-  }, [siteData.products, category, search, lang])
+  const catalogBase = useMemo(() => {
+    return category === 'all'
+      ? siteData.products
+      : siteData.products.filter((p) => p.category === category)
+  }, [siteData.products, category])
+
+  const textHits = useMemo(
+    () => searchProductsByText(catalogBase, search, lang),
+    [catalogBase, search, lang]
+  )
 
   const textScoresById = useMemo(() => {
     const map = new Map<string, number>()
@@ -41,12 +97,29 @@ export default function AllWorksPage() {
     return map
   }, [textHits])
 
+  const imageScoresById = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const m of imageSearch?.matches ?? []) {
+      map.set(m.id, m.score)
+    }
+    return map
+  }, [imageSearch])
+
+  const imageResults = useMemo(() => {
+    if (!imageSearch?.productIds.length) return [] as Product[]
+    const byId = new Map(siteData.products.map((p) => [p.id, p]))
+    return imageSearch.productIds
+      .map((id) => byId.get(id))
+      .filter((p): p is Product => Boolean(p))
+  }, [imageSearch, siteData.products])
+
   const filtered = useMemo(() => {
+    if (imageSearch) return imageResults
     if (search.trim()) return textHits.map((h) => h.product)
-    return category === 'all'
-      ? siteData.products
-      : siteData.products.filter((p) => p.category === category)
-  }, [siteData.products, category, search, textHits])
+    return catalogBase
+  }, [imageSearch, imageResults, search, textHits, catalogBase])
+
+  const isImageMode = Boolean(imageSearch)
 
   return (
     <div className="bg-black md:bg-transparent">
@@ -60,26 +133,25 @@ export default function AllWorksPage() {
           </div>
 
           <div className="mb-5 md:mb-8">
-            <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-[#141414] p-3 md:border-0 md:bg-white md:p-4 md:shadow-sm dark:md:bg-gray-900">
-              <label className="mb-1.5 block text-xs font-medium text-white/70 md:text-sm md:text-gray-700 dark:md:text-gray-300">
-                {t.works.search}
-              </label>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t.works.searchPlaceholder}
-                className="input-field border-white/10 bg-black text-white placeholder:text-white/40 md:border-gray-200 md:bg-white md:text-gray-900 dark:md:border-gray-700 dark:md:bg-gray-950 dark:md:text-gray-100"
-              />
-            </div>
+            <WorksSearchBar
+              search={search}
+              onSearchChange={setSearch}
+              imageSearch={imageSearch}
+              onImageResult={setImageSearch}
+              onClearImage={() => setImageSearch(null)}
+            />
           </div>
 
-          {search.trim() && (
+          {(search.trim() || imageSearch) && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm text-white md:bg-primary-50 md:text-primary-800 dark:md:bg-primary-950 dark:md:text-primary-200">
               <span>
-                {lang === 'ar'
-                  ? `نتائج البحث عن «${search.trim()}»`
-                  : `Results for “${search.trim()}”`}
+                {imageSearch
+                  ? lang === 'ar'
+                    ? 'نتائج من قاعدة البيانات — أعمال مشابهة'
+                    : 'Database results — similar works'
+                  : lang === 'ar'
+                    ? `نتائج البحث عن «${search.trim()}»`
+                    : `Results for “${search.trim()}”`}
               </span>
               <span className="font-semibold">
                 {filtered.length} {t.works.resultsCount}
@@ -87,37 +159,55 @@ export default function AllWorksPage() {
             </div>
           )}
 
-          <div className="mb-5 flex flex-wrap gap-2 md:mb-8">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategory(cat)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:py-2 sm:text-sm ${
-                  category === cat
-                    ? 'bg-primary-600 text-white shadow-md'
-                    : 'bg-white/10 text-white/80 hover:bg-white/15 md:bg-gray-100 md:text-gray-600 md:hover:bg-gray-200 dark:md:bg-gray-800 dark:md:text-gray-300 dark:md:hover:bg-gray-700'
-                }`}
-              >
-                {cat === 'all' ? t.works.filterAll : categoryLabels[lang][cat]}
-              </button>
-            ))}
-          </div>
+          {!isImageMode && (
+            <div className="mb-5 flex flex-wrap gap-2 md:mb-8">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => {
+                    setCategory(cat)
+                    setImageSearch(null)
+                  }}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:py-2 sm:text-sm ${
+                    category === cat
+                      ? 'bg-primary-600 text-white shadow-md'
+                      : 'bg-white/10 text-white/80 hover:bg-white/15 md:bg-gray-100 md:text-gray-600 md:hover:bg-gray-200 dark:md:bg-gray-800 dark:md:text-gray-300 dark:md:hover:bg-gray-700'
+                  }`}
+                >
+                  {cat === 'all' ? t.works.filterAll : categoryLabels[lang][cat]}
+                </button>
+              ))}
+            </div>
+          )}
 
           {filtered.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-lg text-white/70 md:text-gray-500 dark:md:text-gray-400">
                 {t.works.noResults}
               </p>
-              {search.trim() && (
+              {(search.trim() || imageSearch) && (
                 <button
                   type="button"
-                  onClick={() => setSearch('')}
+                  onClick={() => {
+                    setSearch('')
+                    setImageSearch(null)
+                  }}
                   className="mt-4 text-sm font-semibold text-primary-400 hover:underline md:text-primary-600"
                 >
-                  {lang === 'ar' ? 'مسح البحث' : 'Clear search'}
+                  {t.works.clearResults}
                 </button>
               )}
+            </div>
+          ) : isImageMode ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((product) => (
+                <SearchResultCard
+                  key={product.id}
+                  product={product}
+                  score={imageScoresById.get(product.id)}
+                />
+              ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">

@@ -1,6 +1,7 @@
 import type { SiteData } from '../types/siteData'
 import {
   createDefaultSiteData,
+  DEFAULT_ADMIN_EMAIL,
   DEFAULT_ADMIN_PASSWORD,
 } from '../data/defaultSiteData'
 import { apiUrl } from './apiBase'
@@ -103,17 +104,22 @@ function pickNewest(...candidates: SiteData[]): SiteData {
 }
 
 function preserveAdminCredentials(result: SiteData, candidates: SiteData[]): SiteData {
-  if (result.settings.adminPassword) return result
-
-  const source = candidates.find((c) => c.settings.adminPassword)
-  const adminPassword = source?.settings.adminPassword || DEFAULT_ADMIN_PASSWORD
-  const adminEmail = result.settings.adminEmail || source?.settings.adminEmail
+  const emailSource = candidates.find((c) => c.settings.adminEmail?.trim())
+  const passwordSource = candidates.find((c) => c.settings.adminPassword)
+  const adminPassword =
+    result.settings.adminPassword ||
+    passwordSource?.settings.adminPassword ||
+    DEFAULT_ADMIN_PASSWORD
+  const adminEmail =
+    result.settings.adminEmail?.trim() ||
+    emailSource?.settings.adminEmail?.trim() ||
+    DEFAULT_ADMIN_EMAIL
 
   return {
     ...result,
     settings: {
       ...result.settings,
-      adminEmail: adminEmail || result.settings.adminEmail,
+      adminEmail,
       adminPassword,
     },
   }
@@ -501,8 +507,8 @@ export function buildContactWhatsAppMessage(
           'أرغب بالتواصل معكم عبر الموقع:',
           '',
           `الاسم: ${payload.name}`,
-          `البريد: ${payload.email}`,
-          payload.phone ? `الهاتف: ${payload.phone}` : null,
+          payload.email.trim() ? `البريد: ${payload.email.trim()}` : null,
+          payload.phone.trim() ? `الهاتف: ${payload.phone.trim()}` : null,
           '',
           `الرسالة:\n${payload.message}`,
         ]
@@ -511,8 +517,8 @@ export function buildContactWhatsAppMessage(
           'I would like to contact you via your website:',
           '',
           `Name: ${payload.name}`,
-          `Email: ${payload.email}`,
-          payload.phone ? `Phone: ${payload.phone}` : null,
+          payload.email.trim() ? `Email: ${payload.email.trim()}` : null,
+          payload.phone.trim() ? `Phone: ${payload.phone.trim()}` : null,
           '',
           `Message:\n${payload.message}`,
         ]

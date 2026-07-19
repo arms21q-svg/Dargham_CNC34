@@ -22,8 +22,16 @@ export default function Page() {
       />
       <Suspense
         fallback={
-          <div className="section-padding">
-            <div className="container-main py-16 text-center text-gray-500">…</div>
+          <div className="bg-black md:bg-transparent">
+            <div className="section-padding !pt-6 md:!pt-10">
+              <div className="container-main">
+                <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-[#c9a227]/35 bg-[#141414] p-4">
+                  <div className="mb-2 h-4 w-24 rounded bg-white/10" />
+                  <div className="mb-2 h-11 rounded-xl bg-white/10" />
+                  <div className="h-11 rounded-xl bg-[#c9a227]/25" />
+                </div>
+              </div>
+            </div>
           </div>
         }
       >

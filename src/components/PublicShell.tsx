@@ -37,14 +37,11 @@ function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname()
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Instant jump — smooth scroll made detail pages feel laggy
+    window.scrollTo(0, 0)
   }, [pathname])
 
-  return (
-    <div key={pathname} className="animate-fade-in">
-      {children}
-    </div>
-  )
+  return <div className="contents">{children}</div>
 }
 
 export default function PublicShell({ children }: { children: ReactNode }) {

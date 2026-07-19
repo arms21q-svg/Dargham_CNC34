@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { cache } from 'react'
 import ProductDetailPage from '@/views/ProductDetailPage'
 import JsonLd from '@/components/seo/JsonLd'
 import {
@@ -12,8 +13,7 @@ import { prisma } from '@server/db'
 
 type Props = { params: Promise<{ id: string }> }
 
-async function getProduct(id: string) {
-  // Skip DB during local/CI build when pooler may be unreachable
+const getProduct = cache(async (id: string) => {
   if (process.env.NEXT_PHASE === 'phase-production-build') {
     return null
   }
@@ -29,13 +29,18 @@ async function getProduct(id: string) {
         descriptionEn: true,
         image: true,
         materialsAr: true,
+        materialsEn: true,
+        dimensionsAr: true,
+        dimensionsEn: true,
         category: true,
+        featured: true,
+        colors: true,
       },
     })
   } catch {
     return null
   }
-}
+})
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
@@ -86,7 +91,7 @@ export default async function Page({ params }: Props) {
           ]}
         />
       )}
-      <ProductDetailPage />
+      <ProductDetailPage initialProduct={product} />
     </>
   )
 }

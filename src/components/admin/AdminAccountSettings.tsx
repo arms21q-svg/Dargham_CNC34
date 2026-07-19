@@ -13,6 +13,18 @@ import {
   type AdminUserRecord,
 } from '../../utils/adminUsersApi'
 import { EMPLOYEE_JOB_ROLES, generateEmployeePassword } from '../../utils/employeeAccounts'
+import { getAuthToken } from '../../utils/siteDataStorage'
+
+function emailFromSession(): string {
+  try {
+    const token = getAuthToken()
+    if (!token) return ''
+    const payload = JSON.parse(atob(token.split('.')[1] ?? '')) as { email?: string }
+    return (payload.email || '').trim().toLowerCase()
+  } catch {
+    return ''
+  }
+}
 
 interface AdminAccountSettingsProps {
   compact?: boolean
@@ -74,7 +86,8 @@ export default function AdminAccountSettings({ compact = false }: AdminAccountSe
   const [customPassword, setCustomPassword] = useState('')
   const [resetting, setResetting] = useState(false)
 
-  const currentEmail = siteData.settings.adminEmail || DEFAULT_ADMIN_EMAIL
+  const currentEmail =
+    emailFromSession() || siteData.settings.adminEmail || DEFAULT_ADMIN_EMAIL
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true)

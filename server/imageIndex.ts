@@ -34,15 +34,31 @@ type SearchCacheEntry = {
   matches: VisualMatch[]
 }
 
-const CATALOG_TTL_MS = 120_000
-const SEARCH_TTL_MS = 120_000
-const SEARCH_CACHE_MAX = 96
+const CATALOG_TTL_MS = 180_000
+const SEARCH_TTL_MS = 180_000
+const SEARCH_CACHE_MAX = 128
+const SLOW_STAGE_MS = 500
 
 let catalogCache: CatalogCache | null = null
 const searchCache = new Map<string, SearchCacheEntry>()
 /** null = unknown; never run DDL on the search path */
 let pgvectorReady: boolean | null = null
 let pgvectorEnsurePromise: Promise<boolean> | null = null
+let pgvectorProbePromise: Promise<boolean> | null = null
+
+export type SearchStageTimings = {
+  featuresMs: number
+  cacheMs: number
+  dbMs: number
+  rankMs: number
+  totalMs: number
+  path: 'cache' | 'pgvector' | 'memory' | 'empty'
+}
+
+function logSlowStage(stage: string, ms: number, extra?: Record<string, unknown>) {
+  if (ms < SLOW_STAGE_MS) return
+  console.warn('[image-search:slow]', JSON.stringify({ stage, ms, ...extra }))
+}
 
 function hammingDistanceHex(a: string, b: string): number {
   if (!a || !b || a.length !== b.length) return 64
@@ -72,7 +88,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 function toVectorLiteral(vector: number[]): string {
-  return `[${vector.map((v) => (Number.isFinite(v) ? v.toFixed(6) : '0')).join(',')}]`
+  if (!Array.isArray(vector) || vector.length !== VECTOR_DIM) {
+    throw new Error('invalid vector dim')
+  }
+  return `[${vector.map((v) => (Number.isFinite(v) ? Number(v).toFixed(6) : '0')).join(',')}]`
 }
 
 function scoreFromSignals(cosine: number, hamming: number): number {
@@ -220,7 +239,8 @@ async function persistEmbedding(productId: string, vector: number[]): Promise<vo
   try {
     const literal = toVectorLiteral(vector)
     await prisma.$executeRawUnsafe(
-      `UPDATE "Product" SET embedding = '${literal}'::vector WHERE id = $1`,
+      `UPDATE "Product" SET embedding = $1::vector WHERE id = $2`,
+      literal,
       productId
     )
   } catch (err) {
@@ -233,28 +253,60 @@ export function invalidateVisualIndexCache() {
   searchCache.clear()
 }
 
+/** Cheap readiness probe — no DDL on the search path. */
+async function probePgvectorReady(): Promise<boolean> {
+  if (pgvectorReady != null) return pgvectorReady
+  if (pgvectorProbePromise) return pgvectorProbePromise
+
+  pgvectorProbePromise = (async () => {
+    try {
+      await prisma.$queryRawUnsafe(`SELECT 1 FROM "Product" WHERE embedding IS NOT NULL LIMIT 1`)
+      pgvectorReady = true
+      return true
+    } catch {
+      pgvectorReady = false
+      return false
+    } finally {
+      pgvectorProbePromise = null
+    }
+  })()
+
+  return pgvectorProbePromise
+}
+
+async function catalogFingerprint(): Promise<string> {
+  const agg = await prisma.product.aggregate({
+    _count: { id: true },
+    _max: { updatedAt: true },
+  })
+  return `${agg._count.id}:${agg._max.updatedAt?.getTime() ?? 0}`
+}
+
 async function loadCatalogEntries(force = false): Promise<CatalogEntry[]> {
+  // Serve hot cache without touching the DB (biggest search win)
+  if (!force && catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) {
+    return catalogCache.entries
+  }
+
+  const fpStarted = Date.now()
+  const fingerprint = await catalogFingerprint()
+  logSlowStage('catalogFingerprint', Date.now() - fpStarted)
+
+  if (!force && catalogCache && catalogCache.fingerprint === fingerprint) {
+    catalogCache = { ...catalogCache, at: Date.now() }
+    return catalogCache.entries
+  }
+
+  const loadStarted = Date.now()
   const products = await prisma.product.findMany({
+    where: { published: true },
     select: {
       id: true,
       imageHash: true,
       imageVector: true,
-      updatedAt: true,
     },
   })
-
-  const fingerprint = products
-    .map((p) => `${p.id}:${p.updatedAt.getTime()}:${p.imageHash ?? ''}`)
-    .join('|')
-
-  if (
-    !force &&
-    catalogCache &&
-    catalogCache.fingerprint === fingerprint &&
-    Date.now() - catalogCache.at < CATALOG_TTL_MS
-  ) {
-    return catalogCache.entries
-  }
+  logSlowStage('catalogFullLoad', Date.now() - loadStarted, { rows: products.length })
 
   const entries: CatalogEntry[] = []
   for (const p of products) {
@@ -267,10 +319,10 @@ async function loadCatalogEntries(force = false): Promise<CatalogEntry[]> {
   return entries
 }
 
-/** Optional fast path — only if pgvector already known ready. No DDL. */
+/** Primary fast path — HNSW cosine ANN when embeddings exist. */
 async function searchWithPgvector(query: VisualFeatures): Promise<VisualMatch[] | null> {
-  if (pgvectorReady === false) return null
-  if (pgvectorReady !== true) return null
+  const ready = await probePgvectorReady()
+  if (!ready) return null
 
   try {
     const literal = toVectorLiteral(query.vector)
@@ -281,12 +333,14 @@ async function searchWithPgvector(query: VisualFeatures): Promise<VisualMatch[] 
       SELECT
         id,
         "imageHash" as "imageHash",
-        GREATEST(0, LEAST(1, 1 - (embedding <=> '${literal}'::vector)))::float8 AS cosine
+        GREATEST(0, LEAST(1, 1 - (embedding <=> $1::vector)))::float8 AS cosine
       FROM "Product"
-      WHERE embedding IS NOT NULL
-      ORDER BY embedding <=> '${literal}'::vector
-      LIMIT ${SEARCH_TOP_K}
-      `
+      WHERE embedding IS NOT NULL AND published = true
+      ORDER BY embedding <=> $1::vector
+      LIMIT $2
+      `,
+      literal,
+      SEARCH_TOP_K
     )
 
     return rows.map((row) => {
@@ -322,33 +376,67 @@ function searchInMemory(query: VisualFeatures, entries: CatalogEntry[]): VisualM
 /**
  * Rank catalog images against the query using stored DB vectors only.
  * No Gemini / vision / DDL on this path.
+ * Prefer pgvector ANN → in-memory cosine over cached Product.imageVector.
  */
 export async function searchByVisualFeatures(
   queryBase64: string,
   mimeType: string
-): Promise<VisualMatch[]> {
-  const query = await featuresFromBase64(queryBase64, mimeType)
-  if (!query) return []
-
-  const cacheKey = query.hash
-  const cached = searchCache.get(cacheKey)
-  if (cached && Date.now() - cached.at < SEARCH_TTL_MS) {
-    return cached.matches
+): Promise<{ matches: VisualMatch[]; timings: SearchStageTimings }> {
+  const totalStarted = Date.now()
+  const timings: SearchStageTimings = {
+    featuresMs: 0,
+    cacheMs: 0,
+    dbMs: 0,
+    rankMs: 0,
+    totalMs: 0,
+    path: 'empty',
   }
 
-  // Prefer Prisma imageVector catalog (always available after index) — no DDL.
-  const entries = await loadCatalogEntries()
-  let matches = searchInMemory(query, entries)
+  const featStarted = Date.now()
+  const query = await featuresFromBase64(queryBase64, mimeType)
+  timings.featuresMs = Date.now() - featStarted
+  logSlowStage('features', timings.featuresMs)
+  if (!query) {
+    timings.totalMs = Date.now() - totalStarted
+    return { matches: [], timings }
+  }
 
-  // Optional boost if pgvector was already set up during a prior publish/index.
-  if (!matches.length && pgvectorReady === true) {
-    const pg = await searchWithPgvector(query)
-    if (pg?.length) {
-      matches = pg
-        .filter((m) => m.score >= 35)
-        .sort((a, b) => b.score - a.score || a.hamming - b.hamming)
-        .slice(0, SEARCH_TOP_K)
-    }
+  const cacheStarted = Date.now()
+  const cacheKey = query.hash
+  const cached = searchCache.get(cacheKey)
+  timings.cacheMs = Date.now() - cacheStarted
+  if (cached && Date.now() - cached.at < SEARCH_TTL_MS) {
+    timings.path = 'cache'
+    timings.totalMs = Date.now() - totalStarted
+    return { matches: cached.matches, timings }
+  }
+
+  // 1) pgvector HNSW first (scales to 100k+)
+  const dbStarted = Date.now()
+  const pg = await searchWithPgvector(query)
+  timings.dbMs = Date.now() - dbStarted
+  logSlowStage('pgvector', timings.dbMs)
+
+  let matches: VisualMatch[] = []
+  if (pg?.length) {
+    const rankStarted = Date.now()
+    matches = pg
+      .filter((m) => m.score >= 35)
+      .sort((a, b) => b.score - a.score || a.hamming - b.hamming)
+      .slice(0, SEARCH_TOP_K)
+    timings.rankMs = Date.now() - rankStarted
+    timings.path = 'pgvector'
+  } else {
+    // 2) Fallback: cached JSON vectors (no full scan when TTL warm)
+    const memStarted = Date.now()
+    const entries = await loadCatalogEntries()
+    timings.dbMs += Date.now() - memStarted
+    logSlowStage('memoryCatalog', Date.now() - memStarted, { entries: entries.length })
+
+    const rankStarted = Date.now()
+    matches = searchInMemory(query, entries)
+    timings.rankMs = Date.now() - rankStarted
+    timings.path = matches.length ? 'memory' : 'empty'
   }
 
   if (searchCache.size >= SEARCH_CACHE_MAX) {
@@ -357,7 +445,9 @@ export async function searchByVisualFeatures(
   }
   searchCache.set(cacheKey, { at: Date.now(), matches })
 
-  return matches
+  timings.totalMs = Date.now() - totalStarted
+  logSlowStage('totalSearch', timings.totalMs, { path: timings.path })
+  return { matches, timings }
 }
 
 /** Index products missing vectors (publish / admin only — not on search). */

@@ -28,6 +28,7 @@ export interface Translations {
     uploadImage: string
     takePhoto: string
     analyzingImage: string
+    searchingDatabase: string
     imageSearchHint: string
     clearResults: string
     similarity: string
@@ -105,7 +106,8 @@ export const translations: Record<Lang, Translations> = {
       searchByImage: 'البحث بواسطة الصورة',
       uploadImage: 'رفع من المعرض',
       takePhoto: 'التقاط بالكاميرا',
-      analyzingImage: 'جاري البحث في قاعدة البيانات...',
+      analyzingImage: 'جارٍ تحليل الصورة…',
+      searchingDatabase: 'جارٍ البحث في قاعدة البيانات…',
       imageSearchHint: 'ارفع صورة أو التقطها للعثور على أقرب أعمال ضرغام CNC',
       clearResults: 'مسح النتائج',
       similarity: 'نسبة التشابه',
@@ -182,7 +184,8 @@ export const translations: Record<Lang, Translations> = {
       searchByImage: 'Search by image',
       uploadImage: 'Upload from gallery',
       takePhoto: 'Take a photo',
-      analyzingImage: 'Searching database...',
+      analyzingImage: 'Analyzing image…',
+      searchingDatabase: 'Searching the database…',
       imageSearchHint: 'Upload or capture a photo to find the closest Dorgham CNC works',
       clearResults: 'Clear results',
       similarity: 'Similarity',

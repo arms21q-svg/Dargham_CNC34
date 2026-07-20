@@ -6,14 +6,18 @@ import { searchProductsByImageEmbeddings } from '@server/vectorSearch'
 export const maxDuration = 10
 export const runtime = 'nodejs'
 
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'])
+/** ~750KB base64 ≈ ~560KB binary — search payloads stay tiny after client compress */
+const MAX_BASE64_CHARS = 1_000_000
+
 /**
- * Fast image search against Product.imageHash / imageVector in Postgres only.
+ * Fast image search against Product.imageHash / imageVector / pgvector only.
  * Never calls Gemini, OpenAI, or any vision model. Never returns analysis/workType.
  */
 export async function POST(req: NextRequest) {
   const started = Date.now()
   try {
-    const limited = rateLimit(`ai-search:${clientIp(req)}`, 60, 60_000)
+    const limited = rateLimit(`ai-search:${clientIp(req)}`, 30, 60_000)
     if (!limited.ok) return rateLimitResponse(limited.retryAfter)
 
     const body = (await req.json().catch(() => ({}))) as {
@@ -28,8 +32,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'الصورة مطلوبة' }, { status: 400 })
     }
 
-    // Keep payload small for cold starts (~480px JPEG from client)
-    if (image.imageBase64.length > 2_000_000) {
+    const mime = image.mimeType.toLowerCase()
+    if (!ALLOWED_MIME.has(mime)) {
+      return NextResponse.json({ ok: false, error: 'نوع الصورة غير مدعوم' }, { status: 415 })
+    }
+
+    if (image.imageBase64.length > MAX_BASE64_CHARS) {
       return NextResponse.json({ ok: false, error: 'الصورة كبيرة جداً' }, { status: 413 })
     }
 
@@ -43,7 +51,23 @@ export async function POST(req: NextRequest) {
     const matches = embedded?.matches ?? []
     const softMatch = embedded?.softMatch ?? true
     const mode = embedded?.mode ?? 'db-empty'
+    const timings = embedded?.timings
     const ms = Date.now() - started
+
+    if (ms >= 500) {
+      console.warn(
+        '[image-search:timing]',
+        JSON.stringify({
+          ms,
+          mode,
+          matchCount: matches.length,
+          featuresMs: timings?.featuresMs,
+          dbMs: timings?.dbMs,
+          rankMs: timings?.rankMs,
+          path: timings?.path,
+        })
+      )
+    }
 
     return NextResponse.json(
       {
@@ -53,12 +77,14 @@ export async function POST(req: NextRequest) {
         softMatch,
         mode,
         ms,
+        timings,
       },
       {
         headers: {
           'Cache-Control': 'private, max-age=60',
           'X-Image-Search-Mode': mode,
           'X-Image-Search-Ms': String(ms),
+          'X-Image-Search-Path': timings?.path ?? 'unknown',
         },
       }
     )

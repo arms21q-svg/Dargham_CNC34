@@ -137,6 +137,7 @@ export async function getAiRuntime(lang: 'ar' | 'en'): Promise<{
       },
     }),
     prisma.product.findMany({
+      where: { published: true },
       orderBy: [{ featured: 'desc' }, { sortOrder: 'asc' }],
       take: MAX_PRODUCTS_IN_PROMPT,
       select: {

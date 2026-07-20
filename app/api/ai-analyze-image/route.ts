@@ -30,6 +30,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'الصورة مطلوبة' }, { status: 400 })
     }
 
+    const mime = image.mimeType.toLowerCase()
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(mime)) {
+      return NextResponse.json({ ok: false, error: 'نوع الصورة غير مدعوم' }, { status: 415 })
+    }
+    if (image.imageBase64.length > 2_500_000) {
+      return NextResponse.json({ ok: false, error: 'الصورة كبيرة جداً' }, { status: 413 })
+    }
+
     const runtime = await getAiRuntime(replyLang)
     if (!runtime.ok) {
       return NextResponse.json({ ok: false, error: runtime.error }, { status: 403 })

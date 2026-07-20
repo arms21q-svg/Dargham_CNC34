@@ -20,6 +20,8 @@ interface WorksImageSearchProps {
   onResult: (result: WorksImageSearchResult) => void
 }
 
+type SearchPhase = 'idle' | 'compress' | 'search'
+
 export default function WorksImageSearch({ open, onClose, onResult }: WorksImageSearchProps) {
   const { lang, t } = useApp()
   const cameraRef = useRef<HTMLInputElement>(null)
@@ -29,14 +31,17 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
   const [rotation, setRotation] = useState(0)
   const [squareCrop, setSquareCrop] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [phase, setPhase] = useState<SearchPhase>('idle')
+  const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!open) {
-      // Keep pickers ready next open; only abort in-flight search
       abortRef.current?.abort()
       setLoading(false)
+      setPhase('idle')
+      setProgress(0)
     }
   }, [open])
 
@@ -47,6 +52,18 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
     }
   }, [previewUrl])
 
+  useEffect(() => {
+    if (!loading) return
+    const id = window.setInterval(() => {
+      setProgress((p) => {
+        if (phase === 'compress') return Math.min(p + 8, 35)
+        if (phase === 'search') return Math.min(p + 4, 92)
+        return p
+      })
+    }, 120)
+    return () => window.clearInterval(id)
+  }, [loading, phase])
+
   const resetLocal = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
@@ -55,6 +72,8 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
     setSquareCrop(false)
     setError(null)
     setLoading(false)
+    setPhase('idle')
+    setProgress(0)
     if (cameraRef.current) cameraRef.current.value = ''
     if (galleryRef.current) galleryRef.current.value = ''
   }
@@ -65,6 +84,10 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
     if (!file) return
     if (!file.type.startsWith('image/')) {
       setError(lang === 'ar' ? 'يرجى اختيار صورة صالحة' : 'Please choose a valid image')
+      return
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError(lang === 'ar' ? 'حجم الصورة كبير جداً' : 'Image is too large')
       return
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -78,19 +101,25 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
   const runSearch = async () => {
     if (!sourceFile) return
     setLoading(true)
+    setPhase('compress')
+    setProgress(8)
     setError(null)
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
     try {
-      // Single canvas pass (rotate/crop + shrink) — no second resize
       const processed = await processImageForSearch(sourceFile, { rotation, squareCrop })
+      setPhase('search')
+      setProgress(40)
+
       const apiResult: ImageSearchApiResult | null = await searchProductsByImage(
         processed,
         lang,
         controller.signal
       )
+
+      setProgress(100)
 
       if (!apiResult || apiResult.matches.length === 0) {
         setError(
@@ -113,8 +142,17 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
       setError(lang === 'ar' ? 'تعذر البحث في قاعدة البيانات. حاول مجدداً.' : 'Database search failed. Try again.')
     } finally {
       setLoading(false)
+      setPhase('idle')
+      setProgress(0)
     }
   }
+
+  const statusLabel =
+    phase === 'compress'
+      ? t.works.analyzingImage
+      : phase === 'search'
+        ? t.works.searchingDatabase
+        : t.works.startImageSearch
 
   return (
     <div className="mt-3 rounded-2xl border border-[#c9a227]/40 bg-black p-4 text-white shadow-lg md:border-primary-200 md:bg-[#141414]">
@@ -212,13 +250,29 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
             </button>
           </div>
 
+          {loading && (
+            <div className="space-y-2" aria-live="polite">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[#c9a227] transition-[width] duration-150 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="h-16 flex-1 animate-pulse rounded-lg bg-white/10" />
+                <div className="h-16 flex-1 animate-pulse rounded-lg bg-white/10" />
+                <div className="h-16 flex-1 animate-pulse rounded-lg bg-white/10" />
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             disabled={loading}
             onClick={() => void runSearch()}
             className="w-full rounded-xl bg-[#c9a227] px-4 py-3 text-sm font-bold text-black transition hover:bg-[#d4b03a] disabled:opacity-60"
           >
-            {loading ? t.works.analyzingImage : t.works.startImageSearch}
+            {loading ? statusLabel : t.works.startImageSearch}
           </button>
         </div>
       )}

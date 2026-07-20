@@ -8,8 +8,8 @@ export interface PreparedImage {
   dataUrl: string
 }
 
-/** Fast resize for DB visual search — keep payload tiny. */
-export async function prepareImageFile(file: File, maxWidth = 480, quality = 0.78): Promise<PreparedImage> {
+/** Fast resize for DB visual search — keep payload tiny (features are 12×12). */
+export async function prepareImageFile(file: File, maxWidth = 320, quality = 0.7): Promise<PreparedImage> {
   if (!file.type.startsWith('image/')) {
     throw new Error('يرجى اختيار ملف صورة')
   }
@@ -64,10 +64,10 @@ export async function searchProductsByImage(
   lang: 'ar' | 'en',
   signal?: AbortSignal
 ): Promise<ImageSearchApiResult | null> {
-  // processImageForSearch already outputs ~480px JPEG — avoid a second canvas pass
+  // processImageForSearch already outputs ~320px JPEG — avoid a second canvas pass
   let base64: string
   let mimeType: string
-  if (file.type === 'image/jpeg' && file.size > 0 && file.size < 220_000 && file.name === 'search.jpg') {
+  if (file.type === 'image/jpeg' && file.size > 0 && file.size < 120_000 && file.name === 'search.jpg') {
     const buf = await file.arrayBuffer()
     const bytes = new Uint8Array(buf)
     let binary = ''
@@ -78,14 +78,27 @@ export async function searchProductsByImage(
     base64 = btoa(binary)
     mimeType = 'image/jpeg'
   } else {
-    ;({ base64, mimeType } = await prepareImageFile(file, 480, 0.78))
+    ;({ base64, mimeType } = await prepareImageFile(file, 320, 0.7))
   }
-  const res = await fetch(apiUrl('/api/ai-search-by-image'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64: base64, mimeType, lang }),
-    signal,
-  })
+
+  // Cap client wait so the UI never hangs on a stuck serverless cold start
+  const controller = new AbortController()
+  const onAbort = () => controller.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeout(() => controller.abort(), 8_000)
+
+  let res: Response
+  try {
+    res = await fetch(apiUrl('/api/ai-search-by-image'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: base64, mimeType, lang }),
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+  }
 
   if (!res.ok) return null
 
@@ -140,7 +153,7 @@ export async function processImageForSearch(
     const swapped = rotation === 90 || rotation === 270
     const outW = swapped ? srcH : srcW
     const outH = swapped ? srcW : srcH
-    const maxSide = 480
+    const maxSide = 320
     const scale = Math.min(1, maxSide / Math.max(outW, outH))
     const canvasW = Math.max(1, Math.round(outW * scale))
     const canvasH = Math.max(1, Math.round(outH * scale))
@@ -169,7 +182,7 @@ export async function processImageForSearch(
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error('تعذر تحويل الصورة'))),
         'image/jpeg',
-        0.78
+        0.7
       )
     })
 

@@ -25,9 +25,9 @@ export interface GeminiResult {
   rawError?: string
 }
 
-const REQUEST_TIMEOUT_MS = 28_000
-const MAX_RETRIES = 3
-const BASE_BACKOFF_MS = 600
+const REQUEST_TIMEOUT_MS = 12_000
+const MAX_RETRIES = 2
+const BASE_BACKOFF_MS = 400
 
 function isProd() {
   return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production'
@@ -61,8 +61,9 @@ export function getGeminiModels(): string[] {
       '[ai] GEMINI_MODEL is invalid (must be a model id like gemini-2.0-flash, not an API key). Falling back.'
     )
   }
-  const primary = preferred || 'gemini-2.0-flash'
-  const extras = ['gemini-2.0-flash', 'gemini-2.5-flash']
+  // Prefer the fastest Flash variants first; env GEMINI_MODEL still wins when valid
+  const primary = preferred || 'gemini-2.0-flash-lite'
+  const extras = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash']
   return Array.from(new Set([primary, ...extras]))
 }
 

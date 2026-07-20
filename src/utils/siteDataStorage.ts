@@ -36,10 +36,12 @@ export const ADMIN_SESSION_COOKIE = 'dorgham_admin_session'
 
 export function setAdminSessionCookie(active: boolean) {
   if (typeof document === 'undefined') return
+  const secure =
+    typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : ''
   if (active) {
-    document.cookie = `${ADMIN_SESSION_COOKIE}=1; Path=/; Max-Age=${7 * 24 * 3600}; SameSite=Lax`
+    document.cookie = `${ADMIN_SESSION_COOKIE}=1; Path=/; Max-Age=${7 * 24 * 3600}; SameSite=Lax${secure}`
   } else {
-    document.cookie = `${ADMIN_SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
+    document.cookie = `${ADMIN_SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`
   }
 }
 
@@ -256,6 +258,7 @@ export async function loginWithApi(
     const res = await fetchWithTimeout(apiUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ email, password }),
     })
     if (!res) {

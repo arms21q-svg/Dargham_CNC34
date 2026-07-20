@@ -102,12 +102,16 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
 
-    loadSiteData().then((data) => {
-      if (!cancelled) {
-        setSiteData(data)
-        setLoading(false)
-      }
-    })
+    loadSiteData()
+      .then((data) => {
+        if (!cancelled) setSiteData(data)
+      })
+      .catch(() => {
+        /* keep local/defaults */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
     return () => {
       cancelled = true

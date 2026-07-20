@@ -47,6 +47,19 @@ export async function POST(req: NextRequest) {
     }
 
     const JWT_SECRET = getJwtSecret()
+    const isHttps =
+      req.headers.get('x-forwarded-proto') === 'https' ||
+      req.nextUrl.protocol === 'https:'
+
+    const sessionCookie = {
+      name: 'dorgham_admin_session',
+      value: '1',
+      httpOnly: false,
+      path: '/',
+      maxAge: 7 * 24 * 3600,
+      sameSite: 'lax' as const,
+      secure: isHttps,
+    }
 
     const adminUser = await prisma.adminUser.findFirst({
       where: {
@@ -70,7 +83,7 @@ export async function POST(req: NextRequest) {
           { expiresIn: '7d' }
         )
 
-        return NextResponse.json({
+        const res = NextResponse.json({
           ok: true,
           token,
           user: {
@@ -80,6 +93,8 @@ export async function POST(req: NextRequest) {
             nameEn: adminUser.nameEn,
           },
         })
+        res.cookies.set(sessionCookie)
+        return res
       }
     }
 
@@ -107,7 +122,7 @@ export async function POST(req: NextRequest) {
       { expiresIn: '7d' }
     )
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       token,
       user: {
@@ -117,6 +132,8 @@ export async function POST(req: NextRequest) {
         nameEn: 'Super Admin',
       },
     })
+    res.cookies.set(sessionCookie)
+    return res
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

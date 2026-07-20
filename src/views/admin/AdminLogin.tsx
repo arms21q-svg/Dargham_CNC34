@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
 
 export default function AdminLogin() {
-  const { isAdmin, login, loading } = useSiteData()
-  const router = useRouter()
+  const { isAdmin, login } = useSiteData()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,22 +19,21 @@ export default function AdminLogin() {
   })()
 
   useEffect(() => {
-    if (!loading && isAdmin) {
-      router.replace(nextPath)
-    }
-  }, [loading, isAdmin, router, nextPath])
+    if (!isAdmin) return
+    // Full navigation so the session cookie is sent to the proxy gate
+    window.location.replace(nextPath)
+  }, [isAdmin, nextPath])
 
-  if (!loading && isAdmin) {
-    return null
+  if (isAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-stone-100 to-stone-200 p-4 dark:from-gray-950 dark:to-gray-900">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+      </div>
+    )
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (loading) {
-      setError('جاري تحميل البيانات، انتظر قليلاً...')
-      return
-    }
-
     setSubmitting(true)
     setError('')
 
@@ -43,10 +41,12 @@ export default function AdminLogin() {
     setSubmitting(false)
 
     if (result.ok) {
-      router.push(nextPath)
-    } else {
-      setError(result.error ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة')
+      // Hard navigation ensures proxy sees the session cookie immediately
+      window.location.assign(nextPath)
+      return
     }
+
+    setError(result.error ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة')
   }
 
   return (
@@ -62,49 +62,44 @@ export default function AdminLogin() {
           />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">تسجيل الدخول</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            لوحة تحكم ضرغام CNC — البريد وكلمة المرور فقط
+            لوحة تحكم ضرغام CNC — البريد وكلمة المرور
           </p>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="form-label">البريد أو اسم المستخدم</label>
+            <input
+              type="text"
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input-field"
+              placeholder="admin@example.com"
+              autoComplete="username"
+              required
+              autoFocus
+            />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="form-label">البريد الإلكتروني</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
-                placeholder="admin@example.com"
-                autoComplete="username"
-                required
-                autoFocus
-              />
-            </div>
 
-            <div>
-              <label className="form-label">كلمة المرور</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                required
-                autoComplete="current-password"
-              />
-            </div>
+          <div>
+            <label className="form-label">كلمة المرور</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-field"
+              required
+              autoComplete="current-password"
+            />
+          </div>
 
-            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-            <button type="submit" disabled={submitting} className="btn-primary w-full">
-              {submitting ? 'جاري الدخول...' : 'دخول'}
-            </button>
-          </form>
-        )}
+          <button type="submit" disabled={submitting} className="btn-primary w-full">
+            {submitting ? 'جاري الدخول...' : 'دخول'}
+          </button>
+        </form>
       </div>
     </div>
   )

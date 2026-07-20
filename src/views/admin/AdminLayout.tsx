@@ -7,16 +7,19 @@ import { hasPublishSession, isVercelHost } from '../../utils/siteDataStorage'
 import AdminSidebar from './AdminSidebar'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const { isAdmin, logout } = useSiteData()
+  const { isAdmin, authReady, logout } = useSiteData()
   const router = useRouter()
 
   useEffect(() => {
+    // Wait until session is restored — otherwise isAdmin starts false and
+    // we bounce login ↔ admin forever.
+    if (!authReady) return
     if (!isAdmin) {
       router.replace('/admin/login')
     }
-  }, [isAdmin, router])
+  }, [authReady, isAdmin, router])
 
-  if (!isAdmin) {
+  if (!authReady || !isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />

@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState,
   type ReactNode,
 } from 'react'
@@ -34,6 +35,8 @@ import {
 interface SiteDataContextType {
   siteData: SiteData
   loading: boolean
+  /** False until client restores admin session from storage (avoids login↔admin redirect loops). */
+  authReady: boolean
   isAdmin: boolean
   adminRole: string | null
   isSuperAdmin: boolean
@@ -78,10 +81,13 @@ function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
 export function SiteDataProvider({ children }: { children: ReactNode }) {
   const [siteData, setSiteData] = useState<SiteData>(() => createDefaultSiteData())
   const [loading, setLoading] = useState(true)
+  const [authReady, setAuthReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRoleState] = useState<string | null>(null)
 
-  useEffect(() => {
+  // Hydrate auth before children's useEffect redirects (layout effects run parent→… wait: child-first).
+  // Parent useLayoutEffect still runs before child's useEffect, which stops the login↔admin loop.
+  useLayoutEffect(() => {
     const local = loadFromLocalStorageSync()
     if (local) setSiteData(local)
 
@@ -92,14 +98,18 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false)
       setAdminRole(null)
       setAdminRoleState(null)
+    } else if (flagged) {
+      setIsAdmin(true)
+      setAdminSessionCookie(true)
+      setAdminRoleState(getAdminRole())
     } else {
-      setIsAdmin(flagged)
-      if (flagged) {
-        setAdminSessionCookie(true)
-        setAdminRoleState(getAdminRole())
-      }
+      setIsAdmin(false)
+      setAdminRoleState(null)
     }
+    setAuthReady(true)
+  }, [])
 
+  useEffect(() => {
     let cancelled = false
 
     loadSiteData()
@@ -263,6 +273,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       value={{
         siteData,
         loading,
+        authReady,
         isAdmin,
         adminRole,
         isSuperAdmin: adminRole === 'super' || isSuperAdminSession(),

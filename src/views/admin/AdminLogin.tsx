@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
 
 export default function AdminLogin() {
-  const { isAdmin, login } = useSiteData()
+  const { isAdmin, authReady, login } = useSiteData()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,12 +19,11 @@ export default function AdminLogin() {
   })()
 
   useEffect(() => {
-    if (!isAdmin) return
-    // Full navigation so the session cookie is sent to the proxy gate
+    if (!authReady || !isAdmin) return
     window.location.replace(nextPath)
-  }, [isAdmin, nextPath])
+  }, [authReady, isAdmin, nextPath])
 
-  if (isAdmin) {
+  if (!authReady || isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-stone-100 to-stone-200 p-4 dark:from-gray-950 dark:to-gray-900">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -41,7 +40,6 @@ export default function AdminLogin() {
     setSubmitting(false)
 
     if (result.ok) {
-      // Hard navigation ensures proxy sees the session cookie immediately
       window.location.assign(nextPath)
       return
     }

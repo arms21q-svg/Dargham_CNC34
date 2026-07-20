@@ -119,20 +119,15 @@ export async function PUT(req: NextRequest) {
     }
 
     const isSuper = auth.role === 'super'
-    const bcrypt = (await import('bcryptjs')).default
 
-    // Only super-admin may change login credentials via site-data publish
+    // Only super-admin may change login email via site-data publish.
+    // Passwords must use POST /api/auth/update-credentials (avoids accidental resets).
     let adminEmail = existing.adminEmail
-    let passwordHash = existing.adminPasswordHash
-    let nextPassword: string | undefined
+    const passwordHash = existing.adminPasswordHash
 
     if (isSuper) {
       const requestedEmail = body.settings.adminEmail?.trim().toLowerCase()
       if (requestedEmail) adminEmail = requestedEmail
-      nextPassword = body.settings.adminPassword?.trim() || undefined
-      if (nextPassword) {
-        passwordHash = await bcrypt.hash(nextPassword, 10)
-      }
     }
 
     body.settings.adminEmail = adminEmail
@@ -197,7 +192,7 @@ export async function PUT(req: NextRequest) {
     if (isSuper) {
       try {
         const { syncSuperAdminFromConfig } = await import('@server/utils/adminUsers')
-        await syncSuperAdminFromConfig(adminEmail, nextPassword)
+        await syncSuperAdminFromConfig(adminEmail)
       } catch (syncErr) {
         console.error('super admin sync skipped', syncErr)
       }

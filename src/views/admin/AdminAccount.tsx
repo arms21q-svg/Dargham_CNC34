@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
-import AdminSaveBar from '../../components/admin/AdminSaveBar'
+import { apiUrl } from '../../utils/apiBase'
 import { getAuthToken } from '../../utils/siteDataStorage'
 
 function emailFromSession(): string {
@@ -18,17 +17,15 @@ function emailFromSession(): string {
 }
 
 export default function AdminAccount() {
-  const { siteData, loading, updateAdminEmail, updateAdminPassword, logout, isSuperAdmin } =
-    useSiteData()
-  const router = useRouter()
+  const { siteData, loading, logout, isSuperAdmin, updateAdminEmail } = useSiteData()
   const [email, setEmail] = useState(
     () => emailFromSession() || siteData.settings.adminEmail || ''
   )
-  const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   if (loading) {
     return (
@@ -38,7 +35,7 @@ export default function AdminAccount() {
     )
   }
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setMessage(null)
     setError(null)
@@ -63,13 +60,53 @@ export default function AdminAccount() {
       return
     }
 
-    updateAdminEmail(nextEmail)
-    if (password) {
-      updateAdminPassword(password)
+    const token = getAuthToken()
+    if (!token) {
+      setError('انتهت الجلسة — سجّل الدخول مجدداً')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const res = await fetch(apiUrl('/api/auth/update-credentials'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          email: nextEmail,
+          password: password || undefined,
+        }),
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        error?: string
+        message?: string
+      }
+
+      if (!res.ok || !json.ok) {
+        setError(json.error || 'فشل تحديث بيانات الدخول')
+        setSaving(false)
+        return
+      }
+
+      updateAdminEmail(nextEmail)
       setPassword('')
       setPassword2('')
+      setMessage(json.message || 'تم التحديث')
+      setSaving(false)
+
+      // Force re-login with the new credentials
+      window.setTimeout(() => {
+        logout()
+        window.location.assign('/admin/login')
+      }, 1200)
+    } catch {
+      setError('تعذر الاتصال بالسيرفر')
+      setSaving(false)
     }
-    setMessage('تم تحديث البيانات محلياً — اضغط حفظ ونشر لتطبيقها على السيرفر')
   }
 
   return (
@@ -77,20 +114,14 @@ export default function AdminAccount() {
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">حساب المدير</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          تغيير البريد وكلمة المرور ثم الحفظ والنشر
+          يُحفظ البريد وكلمة المرور مباشرة على السيرفر، ثم يُطلب منك تسجيل الدخول من جديد
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-        <div>
-          <label className="form-label">اسم المدير (اختياري)</label>
-          <input
-            className="input-field"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="ضرغام CNC"
-          />
-        </div>
+      <form
+        onSubmit={(e) => void onSubmit(e)}
+        className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900"
+      >
         <div>
           <label className="form-label">البريد الإلكتروني</label>
           <input
@@ -127,18 +158,16 @@ export default function AdminAccount() {
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {message && <p className="text-sm text-emerald-600 dark:text-emerald-400">{message}</p>}
 
-        <button type="submit" className="btn-primary w-full sm:w-auto">
-          تطبيق على المسودة
+        <button type="submit" disabled={saving} className="btn-primary w-full sm:w-auto">
+          {saving ? 'جاري الحفظ...' : 'حفظ بيانات الدخول'}
         </button>
       </form>
-
-      <AdminSaveBar />
 
       <button
         type="button"
         onClick={() => {
           logout()
-          router.push('/admin/login')
+          window.location.assign('/admin/login')
         }}
         className="w-full rounded-xl border border-red-200 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
       >

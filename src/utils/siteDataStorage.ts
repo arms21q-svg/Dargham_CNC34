@@ -2,7 +2,6 @@ import type { SiteData } from '../types/siteData'
 import {
   createDefaultSiteData,
   DEFAULT_ADMIN_EMAIL,
-  DEFAULT_ADMIN_PASSWORD,
 } from '../data/defaultSiteData'
 import { apiUrl } from './apiBase'
 
@@ -107,13 +106,10 @@ function pickNewest(...candidates: SiteData[]): SiteData {
 
 function preserveAdminCredentials(result: SiteData, candidates: SiteData[]): SiteData {
   const emailSource = candidates.find((c) => c.settings.adminEmail?.trim())
-  const passwordSource = candidates.find((c) => c.settings.adminPassword)
-  const adminPassword =
-    result.settings.adminPassword ||
-    passwordSource?.settings.adminPassword ||
-    DEFAULT_ADMIN_PASSWORD
+  // Never re-inject a default/plaintext password from defaults — empty means "unchanged on server".
+  const emailFromResult = result.settings.adminEmail?.trim()
   const adminEmail =
-    result.settings.adminEmail?.trim() ||
+    emailFromResult ||
     emailSource?.settings.adminEmail?.trim() ||
     DEFAULT_ADMIN_EMAIL
 
@@ -122,7 +118,8 @@ function preserveAdminCredentials(result: SiteData, candidates: SiteData[]): Sit
     settings: {
       ...result.settings,
       adminEmail,
-      adminPassword,
+      // Keep empty unless this client session explicitly set a draft password
+      adminPassword: result.settings.adminPassword?.trim() || '',
     },
   }
 }
@@ -205,30 +202,14 @@ export async function loadSiteData(): Promise<SiteData> {
 
 export function saveSiteDataLocal(data: SiteData) {
   try {
-    const payload = { ...data, updatedAt: data.updatedAt ?? Date.now() }
-
-    if (!payload.settings.adminPassword) {
-      try {
-        const stored = localStorage.getItem(SITE_DATA_KEY)
-        if (stored) {
-          const prev = JSON.parse(stored) as SiteData
-          if (prev.settings.adminPassword) {
-            payload.settings = {
-              ...payload.settings,
-              adminPassword: prev.settings.adminPassword,
-            }
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!payload.settings.adminPassword) {
-      payload.settings = {
-        ...payload.settings,
-        adminPassword: DEFAULT_ADMIN_PASSWORD,
-      }
+    const payload = {
+      ...data,
+      updatedAt: data.updatedAt ?? Date.now(),
+      settings: {
+        ...data.settings,
+        // Do not persist plaintext passwords as a fake "default" — publish must not reset them.
+        adminPassword: data.settings.adminPassword?.trim() || '',
+      },
     }
 
     localStorage.setItem(SITE_DATA_KEY, JSON.stringify(payload))
@@ -345,8 +326,16 @@ async function saveToStaticHosting(payload: SiteData): Promise<{
 export async function publishSiteData(
   data: SiteData
 ): Promise<{ ok: boolean; message: string; data?: SiteData }> {
-  const payload: SiteData = { ...data, updatedAt: Date.now() }
   const token = getAuthToken()
+  // Never send a password via general publish — credentials use /api/auth/update-credentials.
+  const payload: SiteData = {
+    ...data,
+    updatedAt: Date.now(),
+    settings: {
+      ...data.settings,
+      adminPassword: '',
+    },
+  }
 
   // Prevent giant base64 payloads from silently 500'ing on Vercel
   try {

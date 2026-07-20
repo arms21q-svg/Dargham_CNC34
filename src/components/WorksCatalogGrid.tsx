@@ -8,7 +8,7 @@ interface WorksCatalogGridProps {
   /** When set with searchActive, shows % on matching cards */
   similarityScores?: Map<string, number>
   searchActive?: boolean
-  /** Desktop column count; mobile is always 2 columns like /works/all */
+  /** Desktop column count; mobile is always 2 columns like /works */
   desktopCols?: 3 | 4
 }
 

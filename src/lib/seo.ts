@@ -131,7 +131,7 @@ export function websiteSchema() {
     inLanguage: ['ar', 'en'],
     potentialAction: {
       '@type': 'SearchAction',
-      target: `${SITE_URL}/works/all?q={search_term_string}`,
+      target: `${SITE_URL}/works?q={search_term_string}`,
       'query-input': 'required name=search_term_string',
     },
   }

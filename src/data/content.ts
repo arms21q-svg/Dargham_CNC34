@@ -4,7 +4,6 @@ export interface Translations {
   nav: {
     home: string
     works: string
-    allWorks: string
     contact: string
     saved: string
   }
@@ -82,7 +81,6 @@ export const translations: Record<Lang, Translations> = {
     nav: {
       home: 'الرئيسية',
       works: 'أعمالنا',
-      allWorks: 'جميع الأعمال',
       contact: 'تواصل معنا',
       saved: 'المحفوظات',
     },
@@ -148,7 +146,8 @@ export const translations: Record<Lang, Translations> = {
     },
     footer: {
       rights: 'جميع الحقوق محفوظة',
-      tagline: 'فن النحت على الخشب بتقنية CNC',
+      tagline:
+        'نبدع في فن النحت والحفر بتقنية CNC على جميع أنواع الخشب، والتفلون، والبلاستيك، والألمنيوم، وألواح الكابون، لنقدم أعمالًا دقيقة تجمع بين الجودة، والإتقان، والإبداع.',
     },
     common: {
       back: 'رجوع',
@@ -159,7 +158,6 @@ export const translations: Record<Lang, Translations> = {
     nav: {
       home: 'Home',
       works: 'Our Works',
-      allWorks: 'All Works',
       contact: 'Contact',
       saved: 'Saved',
     },
@@ -225,7 +223,8 @@ export const translations: Record<Lang, Translations> = {
     },
     footer: {
       rights: 'All rights reserved',
-      tagline: 'Wood carving art with CNC technology',
+      tagline:
+        'We excel in CNC carving and engraving on all types of wood, Teflon, plastic, aluminum, and carbon sheets—delivering precise works that combine quality, craftsmanship, and creativity.',
     },
     common: {
       back: 'Back',

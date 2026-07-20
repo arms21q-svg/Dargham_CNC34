@@ -78,7 +78,7 @@ export default function AllWorksPage() {
         <div className="container-main">
           <div className="mb-6 text-center md:mb-10">
             <h1 className="mb-2 text-3xl font-bold text-white md:mb-3 md:text-4xl md:text-gray-800 dark:md:text-gray-100">
-              {t.works.allWorks}
+              {t.nav.works}
             </h1>
             <p className="hidden text-gray-500 md:block dark:text-gray-400">{t.works.subtitle}</p>
           </div>

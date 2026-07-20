@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, startTransition } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import DirectionalArrow from '../components/DirectionalArrow'
 import ProductCard from '../components/ProductCard'
 import OptimizedImage from '../components/OptimizedImage'
 import { categoryLabels, type Product } from '../data/content'
@@ -133,8 +134,9 @@ export default function ProductDetailPage({
   return (
     <div className="section-padding">
       <div className="container-main">
-        <Link href="/works" className="btn-ghost mb-6 inline-flex" prefetch>
-          ← {t.common.back}
+        <Link href="/works" className="btn-ghost group mb-6 inline-flex items-center gap-1.5" prefetch>
+          <DirectionalArrow direction="back" />
+          {t.common.back}
         </Link>
 
         <div className="grid gap-8 lg:grid-cols-2">

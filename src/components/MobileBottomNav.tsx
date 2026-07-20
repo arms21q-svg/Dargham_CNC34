@@ -16,11 +16,6 @@ const MOBILE_NAV_ITEMS = [
     label: { ar: 'أعمالنا', en: 'Works' },
   },
   {
-    path: '/works/all',
-    icon: 'allWorks',
-    label: { ar: 'الكل', en: 'All' },
-  },
-  {
     path: '/contact',
     icon: 'contact',
     label: { ar: 'تواصل', en: 'Contact' },
@@ -57,13 +52,6 @@ function NavIcon({ name, active }: { name: (typeof MOBILE_NAV_ITEMS)[number]['ic
           d="M4 6a2 2 0 012-2h3l2 2h7a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"
         />
       )}
-      {name === 'allWorks' && (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M4 5h6v6H4V5zm10 0h6v6h-6V5zM4 15h6v6H4v-6zm10 0h6v6h-6v-6z"
-        />
-      )}
       {name === 'contact' && (
         <path
           strokeLinecap="round"
@@ -88,13 +76,7 @@ export default function MobileBottomNav() {
 
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/'
-    if (path === '/works/all') return pathname === '/works/all'
-    if (path === '/works') {
-      return (
-        pathname === '/works' ||
-        (pathname.startsWith('/works/') && !pathname.startsWith('/works/all'))
-      )
-    }
+    if (path === '/works') return pathname === '/works' || pathname.startsWith('/works/')
     return pathname === path || pathname.startsWith(`${path}/`)
   }
 
@@ -107,7 +89,7 @@ export default function MobileBottomNav() {
         className="w-full bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-6px_24px_rgba(0,0,0,0.08)]"
         style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
       >
-        <ul className="mx-auto grid h-[76px] w-full max-w-screen-sm grid-cols-5 items-stretch px-1">
+        <ul className="mx-auto grid h-[76px] w-full max-w-screen-sm grid-cols-4 items-stretch px-1">
           {MOBILE_NAV_ITEMS.map((page) => {
             const active = isActive(page.path)
             return (

@@ -21,7 +21,7 @@ export default function ContactPage() {
     if (!normalizeWhatsAppPhone(contact.whatsapp)) {
       alert(
         lang === 'ar'
-          ? 'رقم واتساب غير مضبوط. حدّثه من لوحة التحكم → روابط التواصل'
+          ? 'رقم واتساب غير مضبوط. حدّثه من لوحة التحكم ← روابط التواصل'
           : 'WhatsApp number is missing. Set it in Admin → Contact links'
       )
       return

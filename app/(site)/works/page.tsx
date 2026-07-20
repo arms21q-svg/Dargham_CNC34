@@ -1,13 +1,13 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
-import WorksPage from '@/views/WorksPage'
+import AllWorksPage from '@/views/AllWorksPage'
 import JsonLd from '@/components/seo/JsonLd'
 import { breadcrumbSchema, buildPageMetadata, DEFAULT_OG_IMAGE } from '@/lib/seo'
 
 export const metadata: Metadata = buildPageMetadata({
   path: '/works',
-  title: 'أعمال مميزة',
-  description: 'أعمال مميزة من ضرغام CNC — جداريات وأبواب وديكور خشبي بتقنية CNC.',
+  title: 'أعمالنا',
+  description: 'استعرض جميع أعمال ضرغام CNC — جداريات وأبواب وديكور خشبي بتقنية CNC مع التصفية حسب الفئة.',
   image: DEFAULT_OG_IMAGE,
 })
 
@@ -17,7 +17,7 @@ export default function Page() {
       <JsonLd
         data={breadcrumbSchema([
           { name: 'الرئيسية', path: '/' },
-          { name: 'أعمال مميزة', path: '/works' },
+          { name: 'أعمالنا', path: '/works' },
         ])}
       />
       <Suspense
@@ -35,7 +35,7 @@ export default function Page() {
           </div>
         }
       >
-        <WorksPage />
+        <AllWorksPage />
       </Suspense>
     </>
   )

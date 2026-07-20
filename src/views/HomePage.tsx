@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import Link from 'next/link'
+import DirectionalArrow from '../components/DirectionalArrow'
 import HeroSlider from '../components/HeroSlider'
 import WorksCatalogGrid, { WorksCatalogSkeleton } from '../components/WorksCatalogGrid'
 import { useApp } from '../context/AppContext'
@@ -78,8 +79,9 @@ export default function HomePage() {
             )}
 
             <div className="mt-8 text-center">
-              <Link href="/works/all" className="btn-secondary">
-                {t.works.allWorks} →
+              <Link href="/works" className="btn-secondary group">
+                {t.nav.works}
+                <DirectionalArrow direction="forward" />
               </Link>
             </div>
           </div>

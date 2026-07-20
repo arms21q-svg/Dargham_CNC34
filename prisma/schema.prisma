@@ -83,6 +83,10 @@ model Product {
   dimensionsAr  String
   dimensionsEn  String
   featured      Boolean  @default(false)
+  /** Gallery images; `image` is the primary/cover */
+  images       String[] @default([])
+  /** false = hidden from public site */
+  published    Boolean  @default(true)
   colors        String[]
   sortOrder     Int      @default(0)
   /** 64-bit average-hash hex for near-exact visual match */
@@ -95,6 +99,8 @@ model Product {
 
   @@index([featured, sortOrder])
   @@index([category, sortOrder])
+  @@index([category, featured, sortOrder])
+  @@index([published, sortOrder])
   @@index([sortOrder])
   @@index([updatedAt])
   @@index([imageHash])

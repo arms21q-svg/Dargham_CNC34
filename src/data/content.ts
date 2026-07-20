@@ -266,10 +266,15 @@ export interface Product {
   title: { ar: string; en: string }
   description: { ar: string; en: string }
   category: Category
+  /** Primary / cover image */
   image: string
+  /** Full gallery (includes primary) */
+  images?: string[]
   materials: { ar: string; en: string }
   dimensions: { ar: string; en: string }
   featured: boolean
+  /** Visible on public site when true */
+  published?: boolean
   colors: string[]
 }
 

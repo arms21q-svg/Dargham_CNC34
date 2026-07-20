@@ -36,6 +36,10 @@ const nextConfig: NextConfig = {
     return [
       { source: '/about', destination: '/', permanent: true },
       { source: '/faq', destination: '/', permanent: true },
+      { source: '/admin/home', destination: '/admin', permanent: false },
+      { source: '/admin/contact', destination: '/admin/social', permanent: false },
+      { source: '/admin/managers', destination: '/admin', permanent: false },
+      { source: '/admin/employees', destination: '/admin/account', permanent: false },
     ]
   },
   async headers() {

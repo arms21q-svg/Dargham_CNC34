@@ -31,6 +31,14 @@ export interface ContactSettings {
   mapsUrl: string
   address: { ar: string; en: string }
   whatsappMessage: { ar: string; en: string }
+  /** Optional direct fields used by social admin (also mirrored into floatLinks) */
+  email?: string
+  phone?: string
+  instagram?: string
+  tiktok?: string
+  telegram?: string
+  youtube?: string
+  linkedin?: string
   floatLinks?: FloatLink[]
   aiAssistant?: AiAssistantSettings
 }
@@ -47,9 +55,11 @@ export type FloatLinkIcon =
   | 'tiktok'
   | 'youtube'
   | 'telegram'
+  | 'linkedin'
   | 'maps'
   | 'website'
   | 'phone'
+  | 'email'
 
 export interface FloatLink {
   id: string

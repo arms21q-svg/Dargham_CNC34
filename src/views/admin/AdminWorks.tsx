@@ -5,21 +5,25 @@ import type { Category, Product } from '../../types/siteData'
 import { categoryLabels } from '../../data/content'
 import { useSiteData } from '../../context/SiteDataContext'
 import AdminSaveBar from '../../components/admin/AdminSaveBar'
-import ImagePicker from '../../components/admin/ImagePicker'
+import GalleryPicker from '../../components/admin/GalleryPicker'
+
 const emptyProduct = (): Product => ({
   id: crypto.randomUUID(),
   title: { ar: '', en: '' },
   description: { ar: '', en: '' },
   category: 'wallArt',
   image: '',
+  images: [],
   materials: { ar: '', en: '' },
   dimensions: { ar: '', en: '' },
   featured: false,
+  published: true,
   colors: ['#8B4513'],
 })
 
 export default function AdminWorks() {
-  const { siteData, loading, addProduct, updateProduct, deleteProduct } = useSiteData()
+  const { siteData, loading, updateProducts, addProduct, updateProduct, deleteProduct } =
+    useSiteData()
   const [editing, setEditing] = useState<Product | null>(null)
   const [form, setForm] = useState<Product>(emptyProduct())
 
@@ -31,6 +35,8 @@ export default function AdminWorks() {
     )
   }
 
+  const products = siteData.products
+
   const startAdd = () => {
     setEditing(null)
     setForm(emptyProduct())
@@ -38,188 +44,230 @@ export default function AdminWorks() {
 
   const startEdit = (product: Product) => {
     setEditing(product)
-    setForm({ ...product })
+    setForm({
+      ...product,
+      images:
+        Array.isArray(product.images) && product.images.length > 0
+          ? product.images
+          : product.image
+            ? [product.image]
+            : [],
+      published: product.published !== false,
+    })
   }
 
-  const handleSave = () => {
-    if (!form.title.ar || !form.image) {
-      alert('يرجى إدخال العنوان بالعربي وإضافة صورة')
-      return
+  const saveForm = () => {
+    if (!form.title.ar.trim() && !form.title.en.trim()) return
+    const gallery =
+      Array.isArray(form.images) && form.images.length > 0
+        ? form.images
+        : form.image
+          ? [form.image]
+          : []
+    const payload: Product = {
+      ...form,
+      image: form.image || gallery[0] || '',
+      images: gallery,
+      published: form.published !== false,
     }
-    if (editing) {
-      updateProduct(form)
-    } else {
-      addProduct(form)
-    }
-    setForm(emptyProduct())
+    if (editing) updateProduct(payload)
+    else addProduct(payload)
     setEditing(null)
-    alert('تم حفظ العمل — اضغط «نشر على الموقع» أعلاه لحفظه بشكل دائم')
+    setForm(emptyProduct())
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('هل تريد حذف هذا العمل؟')) {
-      deleteProduct(id)
-      if (editing?.id === id) {
-        setEditing(null)
-        setForm(emptyProduct())
-      }
-    }
+  const move = (index: number, dir: -1 | 1) => {
+    const next = index + dir
+    if (next < 0 || next >= products.length) return
+    const copy = [...products]
+    const [item] = copy.splice(index, 1)
+    copy.splice(next, 0, item)
+    updateProducts(copy)
   }
-
-  const categories = Object.keys(categoryLabels.ar) as Category[]
 
   return (
-    <div>
-      <AdminSaveBar />
-
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">أعمالنا</h1>
-        <button onClick={startAdd} className="btn-primary !px-4 !py-2 text-sm">
-          + إضافة عمل
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">إدارة الأعمال</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            إضافة وتعديل وترتيب وإظهار/إخفاء الأعمال
+          </p>
+        </div>
+        <button type="button" onClick={startAdd} className="btn-primary">
+          عمل جديد
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card p-6">
-          <h2 className="mb-4 font-semibold">{editing ? 'تعديل عمل' : 'عمل جديد'}</h2>
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">العنوان (عربي)</label>
-                <input
-                  className="input-field"
-                  value={form.title.ar}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, title: { ...p.title, ar: e.target.value } }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">العنوان (English)</label>
-                <input
-                  className="input-field"
-                  value={form.title.en}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, title: { ...p.title, en: e.target.value } }))
-                  }
-                />
-              </div>
-            </div>
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+        <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-gray-100">
+          {editing ? 'تعديل عمل' : 'إضافة عمل'}
+        </h2>
 
-            <ImagePicker
-              value={form.image}
-              onChange={(image) => setForm((p) => ({ ...p, image }))}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="form-label">العنوان (عربي)</label>
+            <input
+              className="input-field"
+              value={form.title.ar}
+              onChange={(e) => setForm({ ...form, title: { ...form.title, ar: e.target.value } })}
             />
-            <div>
-              <label className="form-label">التصنيف</label>
-              <select
-                className="input-field"
-                value={form.category}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, category: e.target.value as Category }))
-                }
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {categoryLabels.ar[cat]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">الخامات (عربي)</label>
-                <input
-                  className="input-field"
-                  value={form.materials.ar}
-                  onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      materials: { ...p.materials, ar: e.target.value },
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="form-label">الأبعاد (عربي)</label>
-                <input
-                  className="input-field"
-                  value={form.dimensions.ar}
-                  onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      dimensions: { ...p.dimensions, ar: e.target.value },
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="form-label">الوصف (عربي)</label>
-              <textarea
-                className="input-field resize-none"
-                rows={3}
-                value={form.description.ar}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    description: { ...p.description, ar: e.target.value },
-                  }))
-                }
-              />
-            </div>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.featured}
-                onChange={(e) => setForm((p) => ({ ...p, featured: e.target.checked }))}
-                className="h-4 w-4 rounded"
-              />
-              <span className="text-sm font-medium">عمل مميز</span>
-            </label>
-
-            <button onClick={handleSave} className="btn-primary w-full">
-              {editing ? 'حفظ التعديل' : 'إضافة العمل'}
-            </button>
+          </div>
+          <div>
+            <label className="form-label">العنوان (إنجليزي)</label>
+            <input
+              className="input-field"
+              value={form.title.en}
+              onChange={(e) => setForm({ ...form, title: { ...form.title, en: e.target.value } })}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="form-label">الوصف (عربي)</label>
+            <textarea
+              className="input-field min-h-[88px]"
+              value={form.description.ar}
+              onChange={(e) =>
+                setForm({ ...form, description: { ...form.description, ar: e.target.value } })
+              }
+            />
+          </div>
+          <div>
+            <label className="form-label">التصنيف</label>
+            <select
+              className="input-field"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value as Category })}
+            >
+              {(Object.keys(categoryLabels.ar) as Category[]).map((cat) => (
+                <option key={cat} value={cat}>
+                  {categoryLabels.ar[cat]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">المواد (عربي)</label>
+            <input
+              className="input-field"
+              value={form.materials.ar}
+              onChange={(e) =>
+                setForm({ ...form, materials: { ...form.materials, ar: e.target.value } })
+              }
+            />
+          </div>
+          <div>
+            <label className="form-label">الأبعاد (عربي)</label>
+            <input
+              className="input-field"
+              value={form.dimensions.ar}
+              onChange={(e) =>
+                setForm({ ...form, dimensions: { ...form.dimensions, ar: e.target.value } })
+              }
+            />
           </div>
         </div>
 
-        <div className="space-y-3">
-          {siteData.products.map((product) => (
-            <div key={product.id} className="card flex gap-4 p-4">
-              <img
-                src={product.image}
-                alt={product.title.ar}
-                className="h-20 w-20 shrink-0 rounded-xl object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate font-semibold">{product.title.ar}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {categoryLabels.ar[product.category]}
-                  {product.featured && ' • مميز'}
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => startEdit(product)}
-                    className="text-sm text-primary-600 hover:underline dark:text-primary-400"
-                  >
-                    تعديل
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className="text-sm text-red-600 hover:underline dark:text-red-400"
-                  >
-                    حذف
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="mt-4">
+          <GalleryPicker
+            images={form.images ?? []}
+            primary={form.image}
+            onChange={(images, primary) => setForm({ ...form, images, image: primary })}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={form.featured}
+              onChange={(e) => setForm({ ...form, featured: e.target.checked })}
+            />
+            عمل مميز
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={form.published !== false}
+              onChange={(e) => setForm({ ...form, published: e.target.checked })}
+            />
+            ظاهر على الموقع
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={saveForm} className="btn-primary">
+            {editing ? 'حفظ التعديل' : 'إضافة'}
+          </button>
+          {editing && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null)
+                setForm(emptyProduct())
+              }}
+              className="btn-secondary"
+            >
+              إلغاء
+            </button>
+          )}
         </div>
       </div>
+
+      <div className="space-y-3">
+        {products.map((product, index) => (
+          <div
+            key={product.id}
+            className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-center"
+          >
+            <img
+              src={product.image || '/logo.png'}
+              alt=""
+              className="h-20 w-20 shrink-0 rounded-xl object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-gray-900 dark:text-gray-100">
+                {product.title.ar || product.title.en || 'بدون عنوان'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {product.published === false ? 'مخفي' : 'ظاهر'}
+                {product.featured ? ' · مميز' : ''}
+                {` · ${(product.images?.length || (product.image ? 1 : 0))} صور`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn-secondary !px-3 !py-2 text-xs" onClick={() => move(index, -1)}>
+                ↑
+              </button>
+              <button type="button" className="btn-secondary !px-3 !py-2 text-xs" onClick={() => move(index, 1)}>
+                ↓
+              </button>
+              <button
+                type="button"
+                className="btn-secondary !px-3 !py-2 text-xs"
+                onClick={() =>
+                  updateProduct({ ...product, published: product.published === false })
+                }
+              >
+                {product.published === false ? 'إظهار' : 'إخفاء'}
+              </button>
+              <button type="button" className="btn-secondary !px-3 !py-2 text-xs" onClick={() => startEdit(product)}>
+                تعديل
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                onClick={() => {
+                  if (confirm('حذف هذا العمل؟')) deleteProduct(product.id)
+                }}
+              >
+                حذف
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <AdminSaveBar />
     </div>
   )
 }

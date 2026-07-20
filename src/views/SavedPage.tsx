@@ -4,11 +4,12 @@ import Link from 'next/link'
 import ProductCard from '../components/ProductCard'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
+import { publicProducts } from '../utils/publicProducts'
 
 export default function SavedPage() {
   const { t, savedIds } = useApp()
   const { siteData } = useSiteData()
-  const saved = siteData.products.filter((p) => savedIds.includes(p.id))
+  const saved = publicProducts(siteData.products).filter((p) => savedIds.includes(p.id))
   return (
     <div className="section-padding">
       <div className="container-main">

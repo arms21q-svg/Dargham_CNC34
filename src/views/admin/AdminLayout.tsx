@@ -27,7 +27,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const needsApiSession = isVercelHost() && !hasPublishSession()
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-950 md:flex-row">
       <AdminSidebar />
       <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
         {needsApiSession && (

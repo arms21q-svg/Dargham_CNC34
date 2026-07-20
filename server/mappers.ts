@@ -99,17 +99,27 @@ export function toSiteData(
         },
       },
     },
-    products: products.map((p) => ({
-      id: p.id,
-      title: { ar: p.titleAr, en: p.titleEn },
-      description: { ar: p.descriptionAr, en: p.descriptionEn },
-      category: p.category as SiteData['products'][0]['category'],
-      image: p.image,
-      materials: { ar: p.materialsAr, en: p.materialsEn },
-      dimensions: { ar: p.dimensionsAr, en: p.dimensionsEn },
-      featured: p.featured,
-      colors: p.colors,
-    })),
+    products: products.map((p) => {
+      const images =
+        Array.isArray(p.images) && p.images.length > 0
+          ? p.images.filter(Boolean)
+          : p.image
+            ? [p.image]
+            : []
+      return {
+        id: p.id,
+        title: { ar: p.titleAr, en: p.titleEn },
+        description: { ar: p.descriptionAr, en: p.descriptionEn },
+        category: p.category as SiteData['products'][0]['category'],
+        image: p.image || images[0] || '',
+        images,
+        materials: { ar: p.materialsAr, en: p.materialsEn },
+        dimensions: { ar: p.dimensionsAr, en: p.dimensionsEn },
+        featured: p.featured,
+        published: p.published !== false,
+        colors: p.colors,
+      }
+    }),
     managers: managers.map((m) => ({
       id: m.id,
       name: { ar: m.nameAr, en: m.nameEn },
@@ -164,6 +174,17 @@ export function configFromSiteData(data: SiteData, passwordHash: string) {
 }
 
 export function productFromSiteData(p: SiteData['products'][0], index: number) {
+  const gallery =
+    Array.isArray(p.images) && p.images.length > 0
+      ? p.images.filter(Boolean)
+      : p.image
+        ? [p.image]
+        : []
+  const primary = (p.image || gallery[0] || '').trim()
+  const images = primary
+    ? [primary, ...gallery.filter((url) => url && url !== primary)]
+    : gallery
+
   return {
     id: String(p.id || `product-${index + 1}`),
     titleAr: p.title?.ar ?? '',
@@ -171,12 +192,14 @@ export function productFromSiteData(p: SiteData['products'][0], index: number) {
     descriptionAr: p.description?.ar ?? '',
     descriptionEn: p.description?.en ?? '',
     category: p.category || 'decor',
-    image: p.image ?? '',
+    image: primary,
+    images,
     materialsAr: p.materials?.ar ?? '',
     materialsEn: p.materials?.en ?? '',
     dimensionsAr: p.dimensions?.ar ?? '',
     dimensionsEn: p.dimensions?.en ?? '',
     featured: Boolean(p.featured),
+    published: p.published !== false,
     colors: Array.isArray(p.colors) ? p.colors : [],
     sortOrder: index,
   }

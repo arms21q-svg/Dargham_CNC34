@@ -8,6 +8,7 @@ import WorksSearchBar, { type WorksImageSearchResult } from '../components/Works
 import OptimizedImage from '../components/OptimizedImage'
 import type { Product } from '../data/content'
 import { searchProductsByText } from '../utils/productTextSearch'
+import { publicProducts } from '../utils/publicProducts'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 
@@ -67,9 +68,11 @@ export default function WorksPage() {
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [imageSearch, setImageSearch] = useState<WorksImageSearchResult | null>(null)
 
+  const catalog = useMemo(() => publicProducts(siteData.products), [siteData.products])
+
   const featuredProducts = useMemo(
-    () => siteData.products.filter((p) => p.featured),
-    [siteData.products]
+    () => catalog.filter((p) => p.featured),
+    [catalog]
   )
 
   const textHits = useMemo(
@@ -95,11 +98,11 @@ export default function WorksPage() {
 
   const imageResults = useMemo(() => {
     if (!imageSearch?.productIds.length) return [] as Product[]
-    const byId = new Map(siteData.products.map((p) => [p.id, p]))
+    const byId = new Map(catalog.map((p) => [p.id, p]))
     return imageSearch.productIds
       .map((id) => byId.get(id))
       .filter((p): p is Product => Boolean(p))
-  }, [imageSearch, siteData.products])
+  }, [imageSearch, catalog])
 
   const filtered = useMemo(() => {
     if (imageSearch) return imageResults

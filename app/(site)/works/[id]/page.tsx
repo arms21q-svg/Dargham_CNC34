@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { cache } from 'react'
 import ProductDetailPage from '@/views/ProductDetailPage'
 import JsonLd from '@/components/seo/JsonLd'
 import {
@@ -9,42 +8,16 @@ import {
   DEFAULT_OG_IMAGE,
   imageObjectSchema,
 } from '@/lib/seo'
-import { prisma } from '@server/db'
+import { getProductById } from '@server/productDetail'
 
 type Props = { params: Promise<{ id: string }> }
 
-const getProduct = cache(async (id: string) => {
-  if (process.env.NEXT_PHASE === 'phase-production-build') {
-    return null
-  }
-
-  try {
-    return await prisma.product.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        titleAr: true,
-        titleEn: true,
-        descriptionAr: true,
-        descriptionEn: true,
-        image: true,
-        materialsAr: true,
-        materialsEn: true,
-        dimensionsAr: true,
-        dimensionsEn: true,
-        category: true,
-        featured: true,
-        colors: true,
-      },
-    })
-  } catch {
-    return null
-  }
-})
+/** ISR: reuse HTML/RSC for identical products for ~2 minutes. */
+export const revalidate = 120
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const product = await getProduct(id)
+  const product = await getProductById(id)
 
   if (!product) {
     return buildPageMetadata({
@@ -70,7 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { id } = await params
-  const product = await getProduct(id)
+  // One PK lookup only — no related / AI / full catalog on the critical path
+  const product = await getProductById(id)
 
   return (
     <>

@@ -36,8 +36,8 @@ function ProductCard({
             <OptimizedImage
               src={product.image}
               alt={product.title[lang]}
-              width={480}
-              widths={[240, 320, 480]}
+              width={400}
+              widths={[240, 320, 400]}
               sizes="50vw"
               className="h-full w-full object-cover transition-transform duration-300 group-active:scale-[1.02]"
             />
@@ -61,8 +61,8 @@ function ProductCard({
               <OptimizedImage
                 src={product.image}
                 alt={product.title[lang]}
-                width={640}
-                widths={[320, 480, 640, 800]}
+                width={480}
+                widths={[320, 400, 480]}
                 sizes="(max-width: 1024px) 50vw, 25vw"
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
@@ -117,6 +117,7 @@ function ProductCard({
               )}
               <Link
                 href={`/works/${product.id}`}
+                prefetch
                 className="rounded-lg bg-primary-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-700"
               >
                 {t.works.viewDetails}
@@ -135,8 +136,8 @@ function ProductCard({
           <OptimizedImage
             src={product.image}
             alt={product.title[lang]}
-            width={640}
-            widths={[320, 480, 640, 800]}
+            width={480}
+            widths={[240, 320, 400, 480]}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
@@ -191,6 +192,7 @@ function ProductCard({
           )}
           <Link
             href={`/works/${product.id}`}
+            prefetch
             className="rounded-lg bg-primary-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-700"
           >
             {t.works.viewDetails}

@@ -206,6 +206,16 @@ export async function PUT(req: NextRequest) {
     // Reindex only products missing visual features (unchanged images keep vectors)
     scheduleProductImageReindex(needsReindex.length ? needsReindex : undefined)
 
+    try {
+      const { revalidateTag } = await import('next/cache')
+      revalidateTag('products', 'max')
+      for (const p of products) {
+        revalidateTag(`product:${p.id}`, 'max')
+      }
+    } catch (cacheErr) {
+      console.warn('product cache revalidate skipped', cacheErr)
+    }
+
     const data = await fetchSiteData()
     return NextResponse.json({
       ok: true,

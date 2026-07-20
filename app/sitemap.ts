@@ -34,6 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (process.env.NEXT_PHASE !== 'phase-production-build') {
     try {
       const products = await prisma.product.findMany({
+        where: { published: true },
         select: { id: true, updatedAt: true },
         orderBy: [{ featured: 'desc' }, { sortOrder: 'asc' }],
       })

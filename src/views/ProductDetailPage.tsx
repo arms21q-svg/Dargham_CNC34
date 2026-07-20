@@ -1,14 +1,14 @@
 'use client'
 
-import { useMemo, useState, useEffect, startTransition } from 'react'
+import { useEffect, useMemo, useState, startTransition } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import ProductCard from '../components/ProductCard'
 import OptimizedImage from '../components/OptimizedImage'
 import { categoryLabels, type Product } from '../data/content'
 import { downloadImage } from '../utils/imageSearch'
+import { apiUrl } from '../utils/apiBase'
 import { useApp } from '../context/AppContext'
-import { useSiteData } from '../context/SiteDataContext'
 
 type InitialProduct = {
   id: string
@@ -40,6 +40,25 @@ function toProduct(p: InitialProduct): Product {
   }
 }
 
+function DetailSkeleton() {
+  return (
+    <div className="section-padding animate-pulse">
+      <div className="container-main">
+        <div className="mb-6 h-10 w-28 rounded-xl bg-gray-200 dark:bg-gray-800" />
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="aspect-[4/3] rounded-2xl bg-gray-200 dark:bg-gray-800" />
+          <div className="space-y-4">
+            <div className="h-7 w-24 rounded-lg bg-gray-200 dark:bg-gray-800" />
+            <div className="h-10 w-4/5 max-w-md rounded-xl bg-gray-200 dark:bg-gray-800" />
+            <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-800" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProductDetailPage({
   initialProduct = null,
 }: {
@@ -52,54 +71,64 @@ export default function ProductDetailPage({
       : Array.isArray(params?.id)
         ? params.id[0]
         : initialProduct?.id
-  const { lang, t, isSaved, toggleSave } = useApp()
-  const { siteData, loading } = useSiteData()
-  const [showRelated, setShowRelated] = useState(false)
 
+  const { lang, t, isSaved, toggleSave } = useApp()
+  const [related, setRelated] = useState<Product[]>([])
+
+  // Critical path: server product only — never wait on full site catalog / AI
   const product = useMemo(() => {
-    const fromSite = id ? siteData.products.find((p) => p.id === id) : undefined
-    if (fromSite) return fromSite
-    if (initialProduct && (!id || initialProduct.id === id)) return toProduct(initialProduct)
+    if (initialProduct && (!id || initialProduct.id === id)) {
+      return toProduct(initialProduct)
+    }
     return undefined
-  }, [siteData.products, id, initialProduct])
+  }, [id, initialProduct])
 
   useEffect(() => {
-    if (!product) return
+    if (!product?.id) return
+    let cancelled = false
+
+    const loadRelated = () => {
+      void fetch(apiUrl(`/api/products/${encodeURIComponent(product.id)}/related`), {
+        cache: 'force-cache',
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json: { products?: InitialProduct[] } | null) => {
+          if (cancelled || !json?.products?.length) return
+          startTransition(() => {
+            setRelated(json.products!.map(toProduct))
+          })
+        })
+        .catch(() => {
+          /* non-critical */
+        })
+    }
+
     const idle =
       typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
-        ? window.requestIdleCallback(() => startTransition(() => setShowRelated(true)), {
-            timeout: 800,
-          })
+        ? window.requestIdleCallback(loadRelated, { timeout: 1200 })
         : null
-    const t = window.setTimeout(() => startTransition(() => setShowRelated(true)), 400)
+    const timer = window.setTimeout(loadRelated, idle == null ? 200 : 900)
+
     return () => {
+      cancelled = true
       if (idle != null && typeof window.cancelIdleCallback === 'function') {
         window.cancelIdleCallback(idle)
       }
-      window.clearTimeout(t)
+      window.clearTimeout(timer)
     }
   }, [product?.id])
 
   if (!product) {
+    if (!initialProduct && id) return <DetailSkeleton />
     return (
       <div className="section-padding text-center">
-        <p className="text-lg text-gray-500 dark:text-gray-400">
-          {loading ? t.common.loading : t.works.noResults}
-        </p>
-        {!loading && (
-          <Link href="/works" className="btn-primary mt-4">
-            {t.common.back}
-          </Link>
-        )}
+        <p className="text-lg text-gray-500 dark:text-gray-400">{t.works.noResults}</p>
+        <Link href="/works" className="btn-primary mt-4" prefetch>
+          {t.common.back}
+        </Link>
       </div>
     )
   }
-
-  const related = showRelated
-    ? siteData.products
-        .filter((p) => p.category === product.category && p.id !== product.id)
-        .slice(0, 3)
-    : []
 
   return (
     <div className="section-padding">

@@ -35,7 +35,7 @@ export default function OptimizedImage({
   ...rest
 }: OptimizedImageProps) {
   const optimized = useMemo(
-    () => optimizeImageUrl(src, { width, quality: priority ? 78 : 72 }),
+    () => optimizeImageUrl(src, { width, quality: priority ? 78 : 65 }),
     [src, width, priority]
   )
 
@@ -46,7 +46,7 @@ export default function OptimizedImage({
     const srcSet =
       src.startsWith('data:') || src.startsWith('blob:')
         ? undefined
-        : imageSrcSet(src, widths, priority ? 78 : 72)
+        : imageSrcSet(src, widths, priority ? 78 : 65)
     return (
       <img
         src={optimized}
@@ -73,7 +73,7 @@ export default function OptimizedImage({
       sizes={sizes}
       priority={priority}
       className={className}
-      quality={priority ? 78 : 72}
+      quality={priority ? 78 : 65}
     />
   )
 }

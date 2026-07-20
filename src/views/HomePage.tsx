@@ -6,12 +6,13 @@ import HeroSlider from '../components/HeroSlider'
 import ProductCard from '../components/ProductCard'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
+import { publicProducts } from '../utils/publicProducts'
 
 export default function HomePage() {
   const { lang, t } = useApp()
   const { siteData } = useSiteData()
   const featured = useMemo(
-    () => siteData.products.filter((p) => p.featured),
+    () => publicProducts(siteData.products).filter((p) => p.featured),
     [siteData.products]
   )
   const home = siteData.home

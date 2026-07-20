@@ -3,7 +3,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
-import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD } from '../../data/defaultSiteData'
 
 export default function AdminLogin() {
   const { isAdmin, login, loading } = useSiteData()
@@ -40,7 +39,7 @@ export default function AdminLogin() {
     setSubmitting(true)
     setError('')
 
-    const result = await login(email, password)
+    const result = await login(email.trim(), password)
     setSubmitting(false)
 
     if (result.ok) {
@@ -51,19 +50,19 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-950">
-      <div className="card w-full max-w-md p-8">
-        <div className="mb-6 text-center">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-stone-100 to-stone-200 p-4 dark:from-gray-950 dark:to-gray-900">
+      <div className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-8 text-center">
           <img
             src="/logo.png"
             alt="ضرغام CNC"
-            width={56}
-            height={56}
-            className="mx-auto mb-4 h-14 w-14 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
+            width={64}
+            height={64}
+            className="mx-auto mb-4 h-16 w-16 rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10"
           />
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">لوحة التحكم</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">تسجيل الدخول</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            أدخل البريد أو اسم المستخدم وكلمة المرور
+            لوحة تحكم ضرغام CNC — البريد وكلمة المرور فقط
           </p>
         </div>
 
@@ -74,13 +73,13 @@ export default function AdminLogin() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="form-label">البريد أو اسم المستخدم</label>
+              <label className="form-label">البريد الإلكتروني</label>
               <input
-                type="text"
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
-                placeholder="admin@dorghamcnc.com"
+                placeholder="admin@example.com"
                 autoComplete="username"
                 required
                 autoFocus
@@ -95,6 +94,7 @@ export default function AdminLogin() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="input-field"
                 required
+                autoComplete="current-password"
               />
             </div>
 
@@ -105,11 +105,6 @@ export default function AdminLogin() {
             </button>
           </form>
         )}
-
-        <div className="mt-4 space-y-1 text-center text-xs text-gray-400">
-          <p>البريد الافتراضي: {DEFAULT_ADMIN_EMAIL}</p>
-          <p>كلمة المرور الافتراضية: {DEFAULT_ADMIN_PASSWORD}</p>
-        </div>
       </div>
     </div>
   )

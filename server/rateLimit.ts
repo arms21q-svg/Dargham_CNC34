@@ -36,7 +36,10 @@ export function clientIp(req: Request): string {
 
 export function rateLimitResponse(retryAfter: number) {
   return Response.json(
-    { ok: false, error: 'Too many requests. Please try again later.' },
+    {
+      ok: false,
+      error: `محاولات كثيرة. حاول مرة أخرى بعد ${retryAfter} ثانية`,
+    },
     {
       status: 429,
       headers: {

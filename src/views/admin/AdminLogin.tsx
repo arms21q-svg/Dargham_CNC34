@@ -36,7 +36,7 @@ export default function AdminLogin() {
     setSubmitting(true)
     setError('')
 
-    const result = await login(email.trim(), password)
+    const result = await login(email.trim(), password.trim())
     setSubmitting(false)
 
     if (result.ok) {
@@ -44,7 +44,7 @@ export default function AdminLogin() {
       return
     }
 
-    setError(result.error ?? 'البريد الإلكتروني أو كلمة المرور غير صحيحة')
+    setError(result.error ?? 'البريد أو كلمة المرور غير صحيحة')
   }
 
   return (
@@ -73,7 +73,7 @@ export default function AdminLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="admin@example.com"
+              placeholder="admin@dorghamcnc.com"
               autoComplete="username"
               required
               autoFocus

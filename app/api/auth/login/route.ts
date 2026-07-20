@@ -2,13 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 import { getJwtSecret, isJwtConfigured } from '@server/vercelAuth'
+import { ensureSuperAdminSeeded } from '@server/utils/adminUsers'
 
 export const maxDuration = 30
 export const runtime = 'nodejs'
 
+function cleanLoginId(raw: unknown): string {
+  return String(raw ?? '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+function cleanPassword(raw: unknown): string {
+  return String(raw ?? '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+    .normalize('NFC')
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(`login:${clientIp(req)}`, 8, 60_000)
+    const limited = rateLimit(`login:${clientIp(req)}`, 20, 60_000)
     if (!limited.ok) return rateLimitResponse(limited.retryAfter)
 
     const isProd =
@@ -32,18 +46,22 @@ export async function POST(req: NextRequest) {
       username?: string
       password?: string
     }
-    const loginId = (body.email || body.username || '').trim().toLowerCase()
-    const { password } = body
+
+    const loginId = cleanLoginId(body.email || body.username)
+    const password = cleanPassword(body.password)
 
     if (!loginId || !password) {
       return NextResponse.json(
-        { ok: false, error: 'البريد أو اسم المستخدم وكلمة المرور مطلوبان' },
+        { ok: false, error: 'أدخل البريد الإلكتروني وكلمة المرور' },
         { status: 400 }
       )
     }
 
-    if (typeof password !== 'string' || password.length > 200) {
-      return NextResponse.json({ ok: false, error: 'بيانات غير صالحة' }, { status: 400 })
+    if (password.length > 200) {
+      return NextResponse.json(
+        { ok: false, error: 'كلمة المرور طويلة جداً' },
+        { status: 400 }
+      )
     }
 
     const JWT_SECRET = getJwtSecret()
@@ -61,6 +79,58 @@ export async function POST(req: NextRequest) {
       secure: isHttps,
     }
 
+    const issueToken = (payload: {
+      email: string
+      role: string
+      userId: string
+      nameAr?: string
+      nameEn?: string
+    }) => {
+      const token = jwt.sign(
+        { email: payload.email, role: payload.role, userId: payload.userId },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      )
+      const res = NextResponse.json({
+        ok: true,
+        token,
+        user: {
+          email: payload.email,
+          role: payload.role,
+          nameAr: payload.nameAr ?? 'المدير العام',
+          nameEn: payload.nameEn ?? 'Super Admin',
+        },
+      })
+      res.cookies.set(sessionCookie)
+      return res
+    }
+
+    // 1) Prefer SiteConfig super credentials (source of truth after password resets)
+    const config = await prisma.siteConfig.findUnique({ where: { id: 1 } })
+    if (config) {
+      const configEmail = cleanLoginId(config.adminEmail)
+      if (loginId === configEmail) {
+        const ok = await bcrypt.compare(password, config.adminPasswordHash)
+        if (ok) {
+          try {
+            await ensureSuperAdminSeeded(configEmail, config.adminPasswordHash)
+          } catch (syncErr) {
+            console.warn('admin user sync on login skipped', syncErr)
+          }
+          return issueToken({
+            email: config.adminEmail,
+            role: 'super',
+            userId: 'legacy-super',
+          })
+        }
+        return NextResponse.json(
+          { ok: false, error: 'البريد أو كلمة المرور غير صحيحة' },
+          { status: 401 }
+        )
+      }
+    }
+
+    // 2) Other admin users (employees)
     const adminUser = await prisma.adminUser.findFirst({
       where: {
         OR: [{ email: loginId }, { username: loginId }],
@@ -77,63 +147,30 @@ export async function POST(req: NextRequest) {
 
       const validPassword = await bcrypt.compare(password, adminUser.passwordHash)
       if (validPassword) {
-        const token = jwt.sign(
-          { email: adminUser.email, role: adminUser.role, userId: adminUser.id },
-          JWT_SECRET,
-          { expiresIn: '7d' }
-        )
-
-        const res = NextResponse.json({
-          ok: true,
-          token,
-          user: {
-            email: adminUser.email,
-            role: adminUser.role,
-            nameAr: adminUser.nameAr,
-            nameEn: adminUser.nameEn,
-          },
+        return issueToken({
+          email: adminUser.email,
+          role: adminUser.role,
+          userId: adminUser.id,
+          nameAr: adminUser.nameAr,
+          nameEn: adminUser.nameEn,
         })
-        res.cookies.set(sessionCookie)
-        return res
       }
     }
 
-    const config = await prisma.siteConfig.findUnique({ where: { id: 1 } })
     if (!config) {
       return NextResponse.json(
         {
           ok: false,
-          error: 'قاعدة البيانات غير مهيأة. شغّل: npm run db:seed',
+          error: 'قاعدة البيانات غير مهيأة. تواصل مع المطوّر.',
         },
         { status: 503 }
       )
     }
 
-    const validEmail = loginId === config.adminEmail.toLowerCase()
-    const validPassword = await bcrypt.compare(password, config.adminPasswordHash)
-
-    if (!validEmail || !validPassword) {
-      return NextResponse.json({ ok: false, error: 'بيانات الدخول غير صحيحة' }, { status: 401 })
-    }
-
-    const token = jwt.sign(
-      { email: config.adminEmail, role: 'super', userId: 'legacy-super' },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+    return NextResponse.json(
+      { ok: false, error: 'البريد أو كلمة المرور غير صحيحة' },
+      { status: 401 }
     )
-
-    const res = NextResponse.json({
-      ok: true,
-      token,
-      user: {
-        email: config.adminEmail,
-        role: 'super',
-        nameAr: 'المدير العام',
-        nameEn: 'Super Admin',
-      },
-    })
-    res.cookies.set(sessionCookie)
-    return res
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

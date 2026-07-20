@@ -2,35 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-const DISPLAY_MS = 2400
+/** Welcome overlay duration on every site open / full reload */
+const DISPLAY_MS = 3000
 const FADE_MS = 500
-const STORAGE_KEY = 'dorgham-cnc-splash-v2'
-/** Re-show after this many days, or when browser storage is cleared. */
-const RESHOW_AFTER_DAYS = 7
-
-function shouldShowSplash(): boolean {
-  try {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return true
-    const seenAt = Number(raw)
-    if (!Number.isFinite(seenAt)) return true
-    return Date.now() - seenAt > RESHOW_AFTER_DAYS * 24 * 60 * 60 * 1000
-  } catch {
-    return false
-  }
-}
-
-function markSplashSeen() {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(Date.now()))
-  } catch {
-    /* ignore */
-  }
-}
 
 /**
- * First-visit brand splash (black & gold). Site loads underneath; no reload on dismiss.
+ * Brand welcome splash — shows for 3 seconds every time the site is opened.
+ * Stays mounted across client navigations so it does not reappear mid-browse.
  */
 export default function BrandSplash({ skip = false }: { skip?: boolean }) {
   const [phase, setPhase] = useState<'hidden' | 'show' | 'leave'>('hidden')
@@ -42,29 +20,25 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
 
   useEffect(() => {
     if (skip) return
-    if (!shouldShowSplash()) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     setPhase('show')
   }, [skip])
 
   useEffect(() => {
     if (phase !== 'show') return
 
-    const syncSkip = () => {
-      if (document.readyState === 'complete') setCanSkip(true)
-    }
-    syncSkip()
-    window.addEventListener('load', syncSkip)
-
+    // Allow early dismiss after a short beat so the screen never feels stuck
+    const skipTimer = window.setTimeout(() => setCanSkip(true), 600)
     const leaveTimer = window.setTimeout(() => setPhase('leave'), DISPLAY_MS)
+
     return () => {
-      window.removeEventListener('load', syncSkip)
+      window.clearTimeout(skipTimer)
       window.clearTimeout(leaveTimer)
     }
   }, [phase])
 
   useEffect(() => {
     if (phase !== 'leave') return
-    markSplashSeen()
     const hideTimer = window.setTimeout(() => setPhase('hidden'), FADE_MS)
     return () => window.clearTimeout(hideTimer)
   }, [phase])

@@ -71,8 +71,10 @@ function NavIcon({ name, active }: { name: (typeof MOBILE_NAV_ITEMS)[number]['ic
 }
 
 export default function MobileBottomNav() {
-  const { lang } = useApp()
+  const { lang, savedIds } = useApp()
   const pathname = usePathname()
+  const savedCount = savedIds.length
+  const savedBadge = savedCount > 99 ? '99+' : String(savedCount)
 
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/'
@@ -92,22 +94,38 @@ export default function MobileBottomNav() {
         <ul className="mx-auto grid h-[76px] w-full max-w-screen-sm grid-cols-4 items-stretch px-1">
           {MOBILE_NAV_ITEMS.map((page) => {
             const active = isActive(page.path)
+            const showSavedBadge = page.icon === 'saved' && savedCount > 0
             return (
               <li key={page.path} className="min-w-0">
                 <Link
                   href={page.path}
                   prefetch
                   aria-current={active ? 'page' : undefined}
+                  aria-label={
+                    showSavedBadge
+                      ? lang === 'ar'
+                        ? `محفوظ، ${savedCount}`
+                        : `Saved, ${savedCount}`
+                      : undefined
+                  }
                   className={`flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-center transition-colors ${
                     active ? 'text-[#b8961e]' : 'text-gray-500'
                   }`}
                 >
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                    className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
                       active ? 'bg-[#c9a227]/15' : ''
                     }`}
                   >
                     <NavIcon name={page.icon} active={active} />
+                    {showSavedBadge ? (
+                      <span
+                        className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c9a227] px-1 text-[9px] font-bold leading-none text-black shadow-sm"
+                        aria-hidden
+                      >
+                        {savedBadge}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="w-full truncate text-[11px] font-semibold leading-none tracking-tight">
                     {page.label[lang]}

@@ -7,12 +7,15 @@ import { useApp } from '../context/AppContext'
 import { PUBLIC_PAGES } from '../data/publicPages'
 
 function Header() {
-  const { lang, setLang, t, isDark, toggleTheme } = useApp()
+  const { lang, setLang, t, isDark, toggleTheme, savedIds } = useApp()
   const pathname = usePathname()
+  const savedCount = savedIds.length
+  const savedBadge = savedCount > 99 ? '99+' : String(savedCount)
 
   const links = PUBLIC_PAGES.map((page) => ({
     to: page.path,
     label: t.nav[page.navKey],
+    navKey: page.navKey,
   }))
 
   const isActive = (path: string) => {
@@ -46,13 +49,21 @@ function Header() {
               key={link.to}
               href={link.to}
               prefetch
-              className={`rounded-lg px-2.5 py-2 text-xs font-medium transition-colors duration-200 lg:px-3 lg:text-sm ${
+              className={`relative rounded-lg px-2.5 py-2 text-xs font-medium transition-colors duration-200 lg:px-3 lg:text-sm ${
                 isActive(link.to)
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-gray-800/60 dark:hover:text-primary-400'
               }`}
             >
               {link.label}
+              {link.navKey === 'saved' && savedCount > 0 ? (
+                <span
+                  className="absolute -top-1 end-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c9a227] px-1 text-[9px] font-bold leading-none text-black"
+                  aria-label={lang === 'ar' ? `${savedCount} محفوظ` : `${savedCount} saved`}
+                >
+                  {savedBadge}
+                </span>
+              ) : null}
             </Link>
           ))}
         </nav>

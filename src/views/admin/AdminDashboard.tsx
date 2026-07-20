@@ -43,7 +43,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">الرئيسية</h1>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">لوحة الإحصائيات</h1>
         <p className="mt-1 text-gray-500 dark:text-gray-400">نظرة سريعة على حالة الموقع</p>
       </div>
 
@@ -59,10 +59,16 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Link
+          href="/admin/home"
+          className="rounded-2xl bg-primary-600 px-4 py-4 text-center text-sm font-semibold text-white hover:bg-primary-700"
+        >
+          الصفحة الرئيسية
+        </Link>
         <Link
           href="/admin/works"
-          className="rounded-2xl bg-primary-600 px-4 py-4 text-center text-sm font-semibold text-white hover:bg-primary-700"
+          className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-center text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
         >
           إدارة الأعمال
         </Link>

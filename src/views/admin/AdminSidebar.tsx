@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
 
 const links = [
-  { to: '/admin', label: 'الرئيسية', end: true },
+  { to: '/admin', label: 'لوحة الإحصائيات', end: true },
+  { to: '/admin/home', label: 'الصفحة الرئيسية' },
   { to: '/admin/works', label: 'إدارة الأعمال' },
   { to: '/admin/social', label: 'مواقع التواصل' },
   { to: '/admin/account', label: 'حساب المدير' },

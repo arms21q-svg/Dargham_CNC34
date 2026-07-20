@@ -3,63 +3,14 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import ProductCard from '../components/ProductCard'
+import WorksCatalogGrid from '../components/WorksCatalogGrid'
 import WorksSearchBar, { type WorksImageSearchResult } from '../components/WorksSearchBar'
-import OptimizedImage from '../components/OptimizedImage'
+import WorksSearchResultCard from '../components/WorksSearchResultCard'
 import type { Product } from '../data/content'
 import { searchProductsByText } from '../utils/productTextSearch'
 import { publicProducts } from '../utils/publicProducts'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
-
-function SearchResultCard({
-  product,
-  score,
-}: {
-  product: Product
-  score?: number
-}) {
-  const { lang, t } = useApp()
-
-  return (
-    <article className="overflow-hidden rounded-2xl border border-[#c9a227]/25 bg-[#141414] text-white shadow-sm md:border-gray-200 md:bg-white md:text-gray-900 dark:md:border-gray-800 dark:md:bg-gray-900 dark:md:text-gray-100">
-      <Link href={`/works/${product.id}`} prefetch className="block">
-        <div className="relative aspect-[4/3] overflow-hidden bg-black/40">
-          <OptimizedImage
-            src={product.image}
-            alt={product.title[lang]}
-            width={640}
-            widths={[320, 480, 640]}
-            sizes="(max-width: 768px) 100vw, 33vw"
-            className="h-full w-full object-cover"
-          />
-          {typeof score === 'number' && (
-            <span className="absolute start-3 top-3 rounded-full bg-[#c9a227] px-2.5 py-1 text-xs font-bold text-black shadow">
-              {score}%
-            </span>
-          )}
-        </div>
-      </Link>
-      <div className="space-y-2 p-4">
-        <h3 className="font-semibold text-[#e8c547] md:text-gray-900 dark:md:text-gray-100">
-          {product.title[lang]}
-        </h3>
-        {typeof score === 'number' && (
-          <p className="text-xs font-semibold text-[#e8c547]">
-            {t.works.similarity}: {score}%
-          </p>
-        )}
-        <Link
-          href={`/works/${product.id}`}
-          prefetch
-          className="mt-1 inline-flex rounded-xl bg-[#c9a227] px-3 py-2 text-xs font-bold text-black"
-        >
-          {t.works.viewDetails}
-        </Link>
-      </div>
-    </article>
-  )
-}
 
 export default function WorksPage() {
   const { lang, t } = useApp()
@@ -171,7 +122,7 @@ export default function WorksPage() {
           ) : isImageMode ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((product) => (
-                <SearchResultCard
+                <WorksSearchResultCard
                   key={product.id}
                   product={product}
                   score={imageScoresById.get(product.id)}
@@ -179,18 +130,11 @@ export default function WorksPage() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">
-              {filtered.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  catalogMobile
-                  similarityScore={
-                    search.trim() ? textScoresById.get(product.id) : undefined
-                  }
-                />
-              ))}
-            </div>
+            <WorksCatalogGrid
+              products={filtered}
+              similarityScores={textScoresById}
+              searchActive={Boolean(search.trim())}
+            />
           )}
 
           {!isImageMode && (

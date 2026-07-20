@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'تصاميم خشبية فاخرة بتقنية CNC في العراق',
     start_url: '/',
     display: 'standalone',
-    background_color: '#faf9f7',
+    background_color: '#0F172A',
     theme_color: '#448d6f',
     lang: 'ar',
     dir: 'rtl',
@@ -27,6 +27,12 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         src: '/icon-512.png',
         sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
         type: 'image/png',
         purpose: 'any',
       },

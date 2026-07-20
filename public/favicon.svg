@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gold" x1="72" y1="56" x2="440" y2="456" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFE9A8"/>
+      <stop offset="35%" stop-color="#E8C547"/>
+      <stop offset="70%" stop-color="#C9A227"/>
+      <stop offset="100%" stop-color="#8B6914"/>
+    </linearGradient>
+    <linearGradient id="goldEdge" x1="200" y1="100" x2="360" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF3C4"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#7A5C0E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark indigo tile with rounded corners -->
+  <rect width="512" height="512" rx="112" ry="112" fill="#0F172A"/>
+
+  <!-- Gear (left) — large teeth for small-size clarity -->
+  <g fill="url(#gold)">
+    <!-- Teeth -->
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(0 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(45 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(90 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(135 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(180 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(225 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(270 192 256)"/>
+    <rect x="168" y="118" width="48" height="72" rx="10" transform="rotate(315 192 256)"/>
+    <!-- Hub -->
+    <circle cx="192" cy="256" r="62"/>
+    <circle cx="192" cy="256" r="24" fill="#0F172A"/>
+  </g>
+
+  <!-- Letter C (bold open ring) — merges visually with gear on the left -->
+  <path
+    fill="none"
+    stroke="url(#goldEdge)"
+    stroke-width="70"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M 378 148
+       A 158 158 0 1 0 378 364"
+  />
+
+  <!-- CNC spindle / machine head in the C opening -->
+  <g fill="url(#gold)">
+    <!-- Gantry bar -->
+    <rect x="322" y="152" width="88" height="28" rx="8"/>
+    <!-- Spindle housing -->
+    <rect x="348" y="176" width="36" height="52" rx="6"/>
+    <!-- Shaft -->
+    <rect x="358" y="224" width="16" height="88" rx="4"/>
+    <!-- Cutter tip -->
+    <polygon points="366,312 344,368 388,368"/>
+  </g>
+</svg>

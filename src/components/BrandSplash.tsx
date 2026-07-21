@@ -96,8 +96,9 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
         <h1 className="brand-splash__title">مرحبًا بكم في ضرغام CNC</h1>
 
         <p className="brand-splash__desc">
-          نقدم حلولًا احترافية في أعمال CNC، الديكورات، المطابخ، والإكسسوارات بأعلى معايير
-          الجودة والدقة.
+          نبدع في فن النحت والحفر بتقنية CNC على جميع أنواع الخشب، والتفلون، والبلاستيك،
+          والألمنيوم، وألواح الكابون، لنقدم أعمالًا دقيقة تجمع بين الجودة، والإتقان، والإبداع
+          الجميع ديكورات
         </p>
 
         {canSkip ? <p className="brand-splash__skip">اضغط للمتابعة</p> : null}

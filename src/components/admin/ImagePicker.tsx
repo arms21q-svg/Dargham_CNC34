@@ -99,7 +99,7 @@ export default function ImagePicker({ value, onChange, label = 'الصورة' }:
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {loading ? 'جاري رفع الصورة...' : 'اضغط لاختيار صورة من جهازك'}
             </span>
-            <span className="text-xs text-gray-400">JPG, PNG, WEBP — حتى 8 ميجابايت</span>
+            <span className="text-xs text-gray-400">JPG, PNG, WEBP — تُضغط تلقائياً للنشر السريع</span>
           </button>
         </div>
       )}

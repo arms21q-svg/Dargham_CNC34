@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@server/db'
-import {
-  configFromSiteData,
-  managerFromSiteData,
-  productFromSiteData,
-  toSiteData,
-} from '@server/mappers'
 import { scheduleProductImageReindex } from '@server/imageIndex'
+import { syncSiteDataToDb } from '@server/syncSiteData'
 import { verifyBearerHeader } from '@server/vercelAuth'
 import type { SiteData } from '@/types/siteData'
 
-export const maxDuration = 30
+export const maxDuration = 60
 export const runtime = 'nodejs'
 
 const MAX_BODY_CHARS = 3_500_000
@@ -34,6 +28,7 @@ async function fetchSiteData() {
     prisma.manager.findMany({ orderBy: { sortOrder: 'asc' } }),
   ])
   if (!config) return null
+  const { toSiteData } = await import('@server/mappers')
   return toSiteData(config, products, managers)
 }
 
@@ -120,8 +115,6 @@ export async function PUT(req: NextRequest) {
 
     const isSuper = auth.role === 'super'
 
-    // Only super-admin may change login email via site-data publish.
-    // Passwords must use POST /api/auth/update-credentials (avoids accidental resets).
     let adminEmail = existing.adminEmail
     const passwordHash = existing.adminPasswordHash
 
@@ -132,62 +125,9 @@ export async function PUT(req: NextRequest) {
 
     body.settings.adminEmail = adminEmail
     body.settings.adminPassword = ''
+    body.updatedAt = Date.now()
 
-    const configData = configFromSiteData(body, passwordHash)
-
-    const previousProducts = await prisma.product.findMany({
-      select: {
-        id: true,
-        image: true,
-        imageHash: true,
-        imageVector: true,
-        indexedAt: true,
-      },
-    })
-    const prevById = new Map(previousProducts.map((p) => [p.id, p]))
-
-    const products = body.products.map((p, i) => {
-      const base = productFromSiteData(p, i)
-      const prev = prevById.get(base.id)
-      if (
-        prev &&
-        prev.image === base.image &&
-        prev.imageHash &&
-        prev.imageVector &&
-        prev.indexedAt
-      ) {
-        return {
-          ...base,
-          imageHash: prev.imageHash,
-          imageVector: prev.imageVector as Prisma.InputJsonValue,
-          indexedAt: prev.indexedAt,
-        }
-      }
-      return base
-    })
-    const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
-    const needsReindex = products.filter((p) => !('imageHash' in p && p.imageHash)).map((p) => p.id)
-
-    try {
-      await prisma.siteConfig.update({
-        where: { id: 1 },
-        data: {
-          ...configData,
-          floatLinks: configData.floatLinks as Prisma.InputJsonValue,
-        },
-      })
-      await prisma.product.deleteMany()
-      if (products.length > 0) {
-        await prisma.product.createMany({ data: products })
-      }
-      await prisma.manager.deleteMany()
-      if (managers.length > 0) {
-        await prisma.manager.createMany({ data: managers })
-      }
-    } catch (dbError) {
-      console.error('site-data DB write failed', dbError)
-      throw dbError
-    }
+    const sync = await syncSiteDataToDb(body, passwordHash)
 
     if (isSuper) {
       try {
@@ -198,24 +138,25 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    // Reindex only products missing visual features (unchanged images keep vectors)
-    scheduleProductImageReindex(needsReindex.length ? needsReindex : undefined)
+    if (sync.needsReindex.length > 0) {
+      scheduleProductImageReindex(sync.needsReindex)
+    }
 
     try {
       const { revalidateTag } = await import('next/cache')
       revalidateTag('products', 'max')
-      for (const p of products) {
-        revalidateTag(`product:${p.id}`, 'max')
-      }
     } catch (cacheErr) {
       console.warn('product cache revalidate skipped', cacheErr)
     }
 
-    const data = await fetchSiteData()
     return NextResponse.json({
       ok: true,
       message: 'تم النشر على قاعدة البيانات',
-      data: data ? sanitizePublicSiteData(data) : data,
+      data: sanitizePublicSiteData(body),
+      meta: {
+        changedProducts: sync.changedProducts,
+        changedManagers: sync.changedManagers,
+      },
     })
   } catch (error) {
     console.error('site-data PUT error', error)

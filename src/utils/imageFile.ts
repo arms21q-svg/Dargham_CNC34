@@ -1,16 +1,18 @@
-const MAX_FILE_SIZE = 8 * 1024 * 1024
+const MAX_FILE_SIZE = 6 * 1024 * 1024
+/** Keep embedded images small enough for fast admin publish. */
+const MAX_DATA_URL_CHARS = 700_000
 
 export async function fileToDataUrl(
   file: File,
-  maxWidth = 1200,
-  quality = 0.82
+  maxWidth = 900,
+  quality = 0.72
 ): Promise<string> {
   if (!file.type.startsWith('image/')) {
     throw new Error('يرجى اختيار ملف صورة')
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error('حجم الصورة كبير جداً. الحد الأقصى 8 ميجابايت')
+    throw new Error('حجم الصورة كبير جداً. الحد الأقصى 6 ميجابايت')
   }
 
   const bitmap = await createImageBitmap(file)
@@ -28,11 +30,29 @@ export async function fileToDataUrl(
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
 
-  const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
-  const dataUrl = canvas.toDataURL(mime, quality)
+  // Prefer JPEG for smaller publish payloads (PNG stays for transparency).
+  const preferPng = file.type === 'image/png'
+  let dataUrl = preferPng
+    ? canvas.toDataURL('image/png')
+    : canvas.toDataURL('image/jpeg', quality)
 
-  if (dataUrl.length > 2_000_000) {
-    throw new Error('الصورة كبيرة بعد الضغط. جرّب صورة أصغر أو استخدم رابط خارجي')
+  if (dataUrl.length > MAX_DATA_URL_CHARS) {
+    dataUrl = canvas.toDataURL('image/jpeg', Math.min(quality, 0.62))
+  }
+
+  if (dataUrl.length > MAX_DATA_URL_CHARS) {
+    const smaller = document.createElement('canvas')
+    const ratio = 720 / width
+    smaller.width = Math.round(width * Math.min(1, ratio))
+    smaller.height = Math.round(height * Math.min(1, ratio))
+    const sctx = smaller.getContext('2d')
+    if (!sctx) throw new Error('تعذر معالجة الصورة')
+    sctx.drawImage(canvas, 0, 0, smaller.width, smaller.height)
+    dataUrl = smaller.toDataURL('image/jpeg', 0.58)
+  }
+
+  if (dataUrl.length > MAX_DATA_URL_CHARS) {
+    throw new Error('الصورة كبيرة بعد الضغط. استخدم رابط URL بدل الرفع من الجهاز')
   }
 
   return dataUrl

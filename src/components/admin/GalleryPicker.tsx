@@ -36,7 +36,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
       const added: string[] = []
       const list = Array.from(files).slice(0, 8)
       for (const file of list) {
-        added.push(await fileToDataUrl(file, 1100, 0.8))
+        added.push(await fileToDataUrl(file, 900, 0.72))
       }
       commit([...gallery, ...added])
     } catch (err) {

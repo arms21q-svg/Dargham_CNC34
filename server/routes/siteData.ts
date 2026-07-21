@@ -1,16 +1,12 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../db'
-import {
-  configFromSiteData,
-  managerFromSiteData,
-  productFromSiteData,
-  toSiteData,
-} from '../mappers'
+import { toSiteData } from '../mappers'
 import type { SiteData } from '../../src/types/siteData'
 import { requireAuth, type AuthRequest } from '../middleware/auth'
 import { syncSuperAdminFromConfig } from '../utils/adminUsers'
 import { scheduleProductImageReindex } from '../imageIndex'
+import { syncSiteDataToDb } from '../syncSiteData'
 
 const router = Router()
 
@@ -88,67 +84,26 @@ router.put('/', requireAuth, async (req: AuthRequest, res) => {
 
     body.settings.adminEmail = adminEmail
     body.settings.adminPassword = ''
+    body.updatedAt = Date.now()
 
-    const configData = configFromSiteData(body, passwordHash)
-
-    const previousProducts = await prisma.product.findMany({
-      select: {
-        id: true,
-        image: true,
-        imageHash: true,
-        imageVector: true,
-        indexedAt: true,
-      },
-    })
-    const prevById = new Map(previousProducts.map((p) => [p.id, p]))
-
-    const products = body.products.map((p, i) => {
-      const base = productFromSiteData(p, i)
-      const prev = prevById.get(base.id)
-      if (
-        prev &&
-        prev.image === base.image &&
-        prev.imageHash &&
-        prev.imageVector &&
-        prev.indexedAt
-      ) {
-        return {
-          ...base,
-          imageHash: prev.imageHash,
-          imageVector: prev.imageVector,
-          indexedAt: prev.indexedAt,
-        }
-      }
-      return base
-    })
-    const needsReindex = products.filter((p) => !('imageHash' in p && p.imageHash)).map((p) => p.id)
-
-    await prisma.siteConfig.update({
-      where: { id: 1 },
-      data: configData,
-    })
-    await prisma.product.deleteMany()
-    await prisma.manager.deleteMany()
-    if (products.length > 0) {
-      await prisma.product.createMany({ data: products })
-    }
-    if (body.managers.length > 0) {
-      await prisma.manager.createMany({
-        data: body.managers.map((m, i) => managerFromSiteData(m, i)),
-      })
-    }
+    const sync = await syncSiteDataToDb(body, passwordHash)
 
     if (isSuper) {
       await syncSuperAdminFromConfig(adminEmail, nextPassword)
     }
 
-    scheduleProductImageReindex(needsReindex.length ? needsReindex : undefined)
+    if (sync.needsReindex.length > 0) {
+      scheduleProductImageReindex(sync.needsReindex)
+    }
 
-    const data = await fetchSiteData()
     res.json({
       ok: true,
       message: 'تم النشر على قاعدة البيانات',
-      data: data ? sanitizePublicSiteData(data) : data,
+      data: sanitizePublicSiteData(body),
+      meta: {
+        changedProducts: sync.changedProducts,
+        changedManagers: sync.changedManagers,
+      },
     })
   } catch (error) {
     console.error('PUT site-data error:', error)

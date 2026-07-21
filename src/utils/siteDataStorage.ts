@@ -12,8 +12,31 @@ export const ADMIN_ROLE_KEY = 'dorgham-cnc-admin-role'
 
 /** Static hosting (cPanel only) — Vercel does not run PHP. */
 const STATIC_SAVE_ENDPOINT = apiUrl('/api/save-data.php')
-/** Cold start on Vercel serverless can exceed 3s. */
-const FETCH_TIMEOUT_MS = 30000
+/** Publish can take longer with many products; keep under Vercel maxDuration. */
+const FETCH_TIMEOUT_MS = 55_000
+const MAX_PUBLISH_CHARS = 3_200_000
+
+export function countEmbeddedImages(data: SiteData): number {
+  let count = 0
+  const check = (value?: string) => {
+    if (value?.startsWith('data:')) count += 1
+  }
+  for (const url of data.home?.slideImages ?? []) check(url)
+  check(data.about?.image)
+  for (const product of data.products ?? []) {
+    check(product.image)
+    for (const url of product.images ?? []) check(url)
+  }
+  return count
+}
+
+export function estimateSiteDataSize(data: SiteData): number {
+  try {
+    return JSON.stringify(data).length
+  } catch {
+    return Number.MAX_SAFE_INTEGER
+  }
+}
 
 export function isVercelHost(): boolean {
   if (typeof window === 'undefined') return false
@@ -338,14 +361,21 @@ export async function publishSiteData(
   }
 
   // Prevent giant base64 payloads from silently 500'ing on Vercel
+  const embeddedCount = countEmbeddedImages(payload)
   try {
     const estimated = JSON.stringify(payload).length
-    if (estimated > 3_200_000) {
+    if (estimated > MAX_PUBLISH_CHARS) {
       return {
         ok: false,
         message:
-          'حجم البيانات كبير جداً للنشر. استبدل الصور المرفوعة محلياً بروابط (URL)',
+          embeddedCount > 0
+            ? `حجم البيانات كبير جداً (${embeddedCount} صورة مرفوعة محلياً). استبدلها بروابط URL ثم أعد النشر`
+            : 'حجم البيانات كبير جداً للنشر. استبدل الصور المرفوعة محلياً بروابط (URL)',
       }
+    }
+    if (estimated > 2_400_000 && embeddedCount > 0) {
+      // Soft warning path still attempts publish — server may finish under new timeout.
+      console.warn('[publish] large payload', { estimated, embeddedCount })
     }
   } catch {
     // ignore stringify errors — API will validate
@@ -373,7 +403,10 @@ export async function publishSiteData(
       if (!res) {
         return {
           ok: false,
-          message: 'انتهت مهلة الاتصال بالسيرفر — أعد المحاولة',
+          message:
+            embeddedCount > 0
+              ? 'انتهت مهلة النشر — الصور المرفوعة من الجهاز تبطّئ الحفظ. استبدلها بروابط URL ثم أعد المحاولة'
+              : 'انتهت مهلة الاتصال بالسيرفر — أعد المحاولة',
         }
       }
 

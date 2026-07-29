@@ -7,7 +7,6 @@ import Footer from '@/components/Footer'
 import MobileBottomNav from '@/components/MobileBottomNav'
 import BrandSplash from '@/components/BrandSplash'
 import NavigationProgress from '@/components/NavigationProgress'
-import RuntimeCleanup from '@/components/RuntimeCleanup'
 
 const ContactFloat = lazy(() => import('@/components/ContactFloat'))
 
@@ -49,7 +48,6 @@ function PageTransition({ children }: { children: ReactNode }) {
 export default function PublicShell({ children }: { children: ReactNode }) {
   return (
     <>
-      <RuntimeCleanup />
       <NavigationProgress />
       <a href="#main-content" className="skip-link">
         تخطي إلى المحتوى

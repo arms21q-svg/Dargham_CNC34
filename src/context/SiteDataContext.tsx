@@ -31,7 +31,7 @@ import {
   setAdminSessionCookie,
   setAuthToken,
 } from '../utils/siteDataStorage'
-import { readBootstrapSiteData } from '../utils/siteBootstrap'
+import { readBootstrapSiteData, isSiteDataNewer, resolveInitialSiteData } from '../utils/siteBootstrap'
 
 interface SiteDataContextType {
   siteData: SiteData
@@ -79,15 +79,18 @@ function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
   }
 }
 
-export function SiteDataProvider({ children }: { children: ReactNode }) {
+export function SiteDataProvider({
+  children,
+  initialSiteData = null,
+}: {
+  children: ReactNode
+  initialSiteData?: SiteData | null
+}) {
   const [siteData, setSiteData] = useState<SiteData>(() => {
-    if (typeof window === 'undefined') return createDefaultSiteData()
-    return readBootstrapSiteData() ?? createDefaultSiteData()
+    const boot = resolveInitialSiteData(initialSiteData)
+    return boot ?? createDefaultSiteData()
   })
-  const [loading, setLoading] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return !readBootstrapSiteData()
-  })
+  const [loading, setLoading] = useState(() => !resolveInitialSiteData(initialSiteData))
   const [authReady, setAuthReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRoleState] = useState<string | null>(null)
@@ -97,7 +100,13 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     purgeStaleClientCache()
 
-    // Auth only — public pages hydrate from SSR bootstrap + API refresh
+    const boot = readBootstrapSiteData()
+    if (boot) {
+      setSiteData((prev) => (isSiteDataNewer(boot, prev) ? boot : prev))
+      setLoading(false)
+    }
+
+    // Auth only — public pages hydrate from SSR bootstrap + background API sync
     const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
     if (flagged && isVercelHost() && !getAuthToken()) {
       sessionStorage.removeItem(ADMIN_AUTH_KEY)
@@ -122,7 +131,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
     loadSiteData()
       .then((data) => {
         if (!cancelled) {
-          setSiteData(data)
+          setSiteData((prev) => (isSiteDataNewer(data, prev) ? data : prev))
           saveSiteDataLocal(data)
         }
       })

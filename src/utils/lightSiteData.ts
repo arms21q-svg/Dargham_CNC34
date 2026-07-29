@@ -14,21 +14,40 @@ function firstHttpUrl(...candidates: (string | undefined)[]): string {
   return ''
 }
 
-/** Drop embedded base64 from public payloads — keeps JSON small for fast load. */
+function productImageUrl(productId: string, index = 0): string {
+  return index <= 0
+    ? `/api/products/${encodeURIComponent(productId)}/image`
+    : `/api/products/${encodeURIComponent(productId)}/image?i=${index}`
+}
+
+function slideImageUrl(index: number): string {
+  return `/api/site/slides/${index}/image`
+}
+
+function resolveProductImage(product: Product, url: string | undefined, index: number): string {
+  if (!url) return firstHttpUrl(product.image, ...(product.images ?? []))
+  if (isHeavyDataUrl(url)) return productImageUrl(product.id, index)
+  return url
+}
+
+/** Drop embedded base64 from public payloads — serve via /api/.../image instead. */
 export function lightPublicSiteData(data: SiteData): SiteData {
-  const slides = (data.home?.slideImages ?? [])
-    .map((url) => (isHeavyDataUrl(url) ? '' : url))
-    .filter(Boolean)
+  const slides = (data.home?.slideImages ?? []).map((url, index) => {
+    if (!url) return ''
+    if (isHeavyDataUrl(url)) return slideImageUrl(index)
+    return url
+  }).filter(Boolean)
 
   const products: Product[] = (data.products ?? []).map((p) => {
-    const httpImage = firstHttpUrl(p.image, ...(p.images ?? []))
-    const image = isHeavyDataUrl(p.image) ? httpImage : p.image
-    const images = (p.images ?? []).filter((url) => !isHeavyDataUrl(url))
+    const gallery = (p.images ?? []).filter(Boolean)
+    const primarySource = p.image || gallery[0] || ''
+    const primary = resolveProductImage(p, primarySource, 0)
+    const images = gallery.map((url, index) => resolveProductImage(p, url, index))
 
     return {
       ...p,
-      image: image || httpImage,
-      images,
+      image: primary || productImageUrl(p.id, 0),
+      images: images.filter(Boolean),
     }
   })
 

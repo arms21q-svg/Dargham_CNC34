@@ -1,0 +1,29 @@
+const MAX_INLINE_CHARS = 512
+
+export function isHeavyDataUrl(url: string | undefined): boolean {
+  return Boolean(url?.startsWith('data:') && url.length > MAX_INLINE_CHARS)
+}
+
+export function productImageUrl(productId: string, index = 0): string {
+  return index <= 0
+    ? `/api/products/${encodeURIComponent(productId)}/image`
+    : `/api/products/${encodeURIComponent(productId)}/image?i=${index}`
+}
+
+export function slideImageUrl(index: number): string {
+  return `/api/site/slides/${index}/image`
+}
+
+/** Replace embedded base64 with lightweight proxy URLs for public pages. */
+export function toPublicMediaUrl(
+  ownerId: string,
+  url: string | undefined,
+  index = 0,
+  kind: 'product' | 'slide' = 'product'
+): string {
+  if (!url) return ''
+  if (isHeavyDataUrl(url)) {
+    return kind === 'slide' ? slideImageUrl(index) : productImageUrl(ownerId, index)
+  }
+  return url
+}

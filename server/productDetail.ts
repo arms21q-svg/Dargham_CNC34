@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { prisma } from './db'
+import { isHeavyDataUrl, productImageUrl } from './mediaUrls'
 
 /** Fields needed to render the product detail page (no vectors / hashes). */
 export const PRODUCT_DETAIL_SELECT = {
@@ -63,7 +64,13 @@ async function fetchProductById(id: string): Promise<ProductDetailRow | null> {
     select: PRODUCT_DETAIL_SELECT,
   })
   if (!row || row.published === false) return null
-  return row
+  return {
+    ...row,
+    image: isHeavyDataUrl(row.image) ? productImageUrl(id, 0) : row.image,
+    images: (row.images ?? []).map((url, index) =>
+      isHeavyDataUrl(url) ? productImageUrl(id, index) : url
+    ),
+  }
 }
 
 /**
@@ -100,7 +107,15 @@ export async function getRelatedProducts(
           select: PRODUCT_CARD_SELECT,
           orderBy: [{ featured: 'desc' }, { sortOrder: 'asc' }],
           take: limit,
-        }),
+        }).then((rows) =>
+          rows.map((row) => ({
+            ...row,
+            image: isHeavyDataUrl(row.image) ? productImageUrl(row.id, 0) : row.image,
+            images: (row.images ?? []).map((url, index) =>
+              isHeavyDataUrl(url) ? productImageUrl(row.id, index) : url
+            ),
+          }))
+        ),
       ['product-related', id, category, String(limit)],
       { revalidate: 60, tags: ['products', `product:${id}`] }
     )()

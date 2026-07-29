@@ -22,6 +22,7 @@ import {
   isSuperAdminSession,
   isVercelHost,
   loadSiteData,
+  loadSiteDataFresh,
   loginWithApi,
   publishSiteData,
   saveSiteDataLocal,
@@ -261,7 +262,9 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   const publish = useCallback(async () => {
     const result = await publishSiteData(siteData)
     if (result.ok) {
-      setSiteData(result.data ?? { ...siteData, updatedAt: Date.now() })
+      const fresh = await loadSiteDataFresh()
+      setSiteData(fresh)
+      saveSiteDataLocal(fresh)
     }
     return result
   }, [siteData])

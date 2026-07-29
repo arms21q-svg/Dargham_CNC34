@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
-import { getCachedSiteData } from '@server/cachedSiteData'
+import { getCachedSiteData, fetchSiteDataFresh } from '@server/cachedSiteData'
 import { lightPublicSiteData } from '@server/lightSiteData'
 import { scheduleProductImageReindex } from '@server/imageIndex'
 import { syncSiteDataToDb } from '@server/syncSiteData'
@@ -22,9 +22,10 @@ function sanitizePublicSiteData(data: SiteData): SiteData {
   }
 }
 
-async function fetchSiteData() {
-  return getCachedSiteData()
+async function fetchSiteData(fresh = false) {
+  return fresh ? fetchSiteDataFresh() : getCachedSiteData()
 }
+
 async function parseBody(req: NextRequest): Promise<SiteData> {
   const text = await req.text()
   if (!text) throw new Error('جسم الطلب فارغ')
@@ -70,7 +71,10 @@ function errorMessage(error: unknown): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const data = await fetchSiteData()
+    const isAdmin = Boolean(verifyBearerHeader(req.headers.get('authorization')))
+    const fresh = req.nextUrl.searchParams.get('fresh') === '1'
+    const data = await fetchSiteData(fresh)
+
     if (!data) {
       return NextResponse.json(
         { ok: false, error: 'لا توجد بيانات. شغّل: npm run db:seed' },
@@ -78,7 +82,6 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const isAdmin = Boolean(verifyBearerHeader(req.headers.get('authorization')))
     const sanitized = sanitizePublicSiteData(data)
     const payload = isAdmin ? sanitized : lightPublicSiteData(sanitized)
 
@@ -86,7 +89,7 @@ export async function GET(req: NextRequest) {
       { ok: true, data: payload },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
         },
       }
     )
@@ -147,19 +150,22 @@ export async function PUT(req: NextRequest) {
       console.warn('site cache revalidate skipped', cacheErr)
     }
 
-    return NextResponse.json({
-      ok: true,
-      message: 'تم النشر على قاعدة البيانات',
-      data: sanitizePublicSiteData(body),
-      meta: {
-        changedProducts: sync.changedProducts,
-        changedManagers: sync.changedManagers,
+    return NextResponse.json(
+      {
+        ok: true,
+        message: 'تم النشر على قاعدة البيانات',
+        data: sanitizePublicSiteData(body),
+        meta: {
+          changedProducts: sync.changedProducts,
+          changedManagers: sync.changedManagers,
+        },
       },
-    }, {
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-    })
+      {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      }
+    )
   } catch (error) {
     console.error('site-data PUT error', error)
     return NextResponse.json({ ok: false, error: errorMessage(error) }, { status: 500 })

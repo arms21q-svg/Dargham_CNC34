@@ -13,13 +13,18 @@ async function fetchSiteDataRaw(): Promise<SiteData | null> {
   return toSiteData(config, products, managers)
 }
 
+/** Bypass unstable_cache — read directly from DB (e.g. right after publish). */
+export async function fetchSiteDataFresh(): Promise<SiteData | null> {
+  return fetchSiteDataRaw()
+}
+
 /** Cross-request cache — invalidated via revalidateTag('site-data') on admin publish. */
 export async function getCachedSiteData(): Promise<SiteData | null> {
   if (process.env.NEXT_PHASE === 'phase-production-build') return null
 
   try {
     return await unstable_cache(fetchSiteDataRaw, ['site-data-v1'], {
-      revalidate: 60,
+      revalidate: false,
       tags: ['site-data'],
     })()
   } catch {

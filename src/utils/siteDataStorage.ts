@@ -160,9 +160,11 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
   }
 }
 
-async function loadFromApi(defaults: SiteData): Promise<SiteData | null> {
+async function loadFromApi(defaults: SiteData, fresh = false): Promise<SiteData | null> {
   const token = getAuthToken()
-  const res = await fetchWithTimeout(apiUrl('/api/site-data'), {
+  const qs = fresh ? `?fresh=1&v=${Date.now()}` : `?v=${Date.now()}`
+  const res = await fetchWithTimeout(apiUrl(`/api/site-data${qs}`), {
+    cache: 'no-store',
     headers: {
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -227,6 +229,16 @@ export async function loadSiteData(): Promise<SiteData> {
   if (candidates.length === 0) return defaults
 
   return preserveAdminCredentials(pickNewest(...candidates), [defaults, ...candidates])
+}
+
+/** Force-read from DB (bypass server cache) — use right after publish. */
+export async function loadSiteDataFresh(): Promise<SiteData> {
+  const defaults = createDefaultSiteData()
+  const apiData = await loadFromApi(defaults, true)
+  if (apiData) {
+    return preserveAdminCredentials(stripHeavyEmbeddedMedia(apiData), [defaults, apiData])
+  }
+  return loadSiteData()
 }
 
 export function saveSiteDataLocal(data: SiteData) {

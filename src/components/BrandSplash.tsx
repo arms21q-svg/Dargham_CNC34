@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-/** Welcome overlay duration on every site open / full reload */
-const DISPLAY_MS = 3000
-const FADE_MS = 500
+/** Welcome overlay — once per tab session; fast dismiss for better LCP. */
+const DISPLAY_MS = 1200
+const FADE_MS = 400
 
 /**
  * Brand welcome splash — shows for 3 seconds every time the site is opened.
@@ -30,7 +30,7 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
     if (phase !== 'show') return
 
     // Allow early dismiss after a short beat so the screen never feels stuck
-    const skipTimer = window.setTimeout(() => setCanSkip(true), 600)
+    const skipTimer = window.setTimeout(() => setCanSkip(true), 300)
     const leaveTimer = window.setTimeout(() => setPhase('leave'), DISPLAY_MS)
 
     return () => {

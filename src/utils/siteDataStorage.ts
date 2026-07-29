@@ -7,6 +7,7 @@ import { stripHeavyEmbeddedMedia } from './lightSiteData'
 import { apiUrl } from './apiBase'
 
 export const SITE_DATA_KEY = 'dorgham-cnc-site-data'
+export const SITE_DATA_VERSION_KEY = 'dorgham-cnc-data-version'
 export const ADMIN_AUTH_KEY = 'dorgham-cnc-admin-auth'
 export const AUTH_TOKEN_KEY = 'dorgham-cnc-auth-token'
 export const ADMIN_ROLE_KEY = 'dorgham-cnc-admin-role'
@@ -43,6 +44,34 @@ export function isVercelHost(): boolean {
   if (typeof window === 'undefined') return false
   const h = window.location.hostname
   return h.includes('vercel.app') || h.includes('dhirghamcnc.com')
+}
+
+/** After deploy: drop stale site cache + unregister legacy service workers. */
+export function purgeStaleClientCache() {
+  if (typeof window === 'undefined') return
+
+  const buildId = process.env.NEXT_PUBLIC_BUILD_ID ?? ''
+  if (buildId) {
+    const stored = localStorage.getItem(SITE_DATA_VERSION_KEY)
+    if (stored !== buildId) {
+      localStorage.removeItem(SITE_DATA_KEY)
+      localStorage.setItem(SITE_DATA_VERSION_KEY, buildId)
+    }
+  }
+
+  if ('serviceWorker' in navigator) {
+    void navigator.serviceWorker.getRegistrations().then((regs) => {
+      for (const reg of regs) void reg.unregister()
+    })
+  }
+
+  if ('caches' in window) {
+    void caches.keys().then((keys) => {
+      for (const key of keys) {
+        if (/dorgham|site-data|workbox|precache/i.test(key)) void caches.delete(key)
+      }
+    })
+  }
 }
 
 /** Admin UI session without API JWT cannot publish on Vercel. */
@@ -220,6 +249,11 @@ export async function loadSiteData(): Promise<SiteData> {
   const apiData = await loadFromApi(defaults)
   if (apiData) {
     return preserveAdminCredentials(stripHeavyEmbeddedMedia(apiData), [defaults, apiData])
+  }
+
+  // Production: never show stale offline copies when the live API is unreachable
+  if (isVercelHost()) {
+    return defaults
   }
 
   const localData = loadFromLocalStorage(defaults)

@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  env: {
+    NEXT_PUBLIC_BUILD_ID:
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_BUILD_ID ?? 'dev',
+  },
   generateBuildId: async () => {
     return process.env.VERCEL_GIT_COMMIT_SHA ?? `build-${Date.now()}`
   },
@@ -60,11 +64,38 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
         source: '/api/site-data',
         headers: [
           {
             key: 'Cache-Control',
             value: 'no-store, no-cache, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/api/products/:id/image',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+      {
+        source: '/api/site/slides/:index/image',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
           },
         ],
       },

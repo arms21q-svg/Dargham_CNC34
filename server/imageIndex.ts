@@ -3,7 +3,7 @@ import { prisma } from './db'
 
 export const VECTOR_SIZE = 12
 export const VECTOR_DIM = VECTOR_SIZE * VECTOR_SIZE * 3 // 432
-export const SEARCH_TOP_K = 20
+export const SEARCH_TOP_K = 10
 
 export type VisualFeatures = {
   hash: string
@@ -34,8 +34,8 @@ type SearchCacheEntry = {
   matches: VisualMatch[]
 }
 
-const CATALOG_TTL_MS = 180_000
-const SEARCH_TTL_MS = 180_000
+const CATALOG_TTL_MS = 300_000
+const SEARCH_TTL_MS = 300_000
 const SEARCH_CACHE_MAX = 128
 const SLOW_STAGE_MS = 500
 

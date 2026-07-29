@@ -3,6 +3,9 @@ import ContactPage from '@/views/ContactPage'
 import JsonLd from '@/components/seo/JsonLd'
 import { breadcrumbSchema, buildPageMetadata } from '@/lib/seo'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export const metadata: Metadata = buildPageMetadata({
   path: '/contact',
   title: 'اتصل بنا',

@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       },
       {
         headers: {
-          'Cache-Control': 'private, max-age=60',
+          'Cache-Control': 'no-store',
           'X-Image-Search-Mode': mode,
           'X-Image-Search-Ms': String(ms),
           'X-Image-Search-Path': timings?.path ?? 'unknown',

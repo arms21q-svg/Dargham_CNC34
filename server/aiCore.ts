@@ -20,12 +20,12 @@ export interface ImagePayload {
 }
 
 export const HISTORY_LIMIT = 10
-const CONTEXT_CACHE_TTL_MS = 60_000
+const CONTEXT_CACHE_TTL_MS = 120_000
 const MAX_HISTORY_CHARS = 500
 const MAX_PRODUCTS_IN_PROMPT = 16
 const MAX_DESC_CHARS = 90
-const ANSWER_CACHE_TTL_MS = 5 * 60_000
-const ANSWER_CACHE_MAX = 80
+const ANSWER_CACHE_TTL_MS = 15 * 60_000
+const ANSWER_CACHE_MAX = 120
 
 type AnswerCacheEntry = { at: number; reply: string; mode: string }
 const answerCache = new Map<string, AnswerCacheEntry>()

@@ -85,7 +85,7 @@ export async function searchProductsByImage(
   const controller = new AbortController()
   const onAbort = () => controller.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
-  const timer = setTimeout(() => controller.abort(), 14_000)
+  const timer = setTimeout(() => controller.abort(), 12_000)
 
   let res: Response
   try {
@@ -100,7 +100,9 @@ export async function searchProductsByImage(
     signal?.removeEventListener('abort', onAbort)
   }
 
-  if (!res.ok) return null
+  if (!res.ok) {
+    return null
+  }
 
   const json = (await res.json()) as {
     ok?: boolean

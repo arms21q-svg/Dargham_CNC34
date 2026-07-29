@@ -7,12 +7,27 @@ export const runtime = 'nodejs'
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`
+
+    const [productCount, indexedCount] = await Promise.all([
+      prisma.product.count({ where: { published: true } }),
+      prisma.product.count({
+        where: {
+          published: true,
+          indexedAt: { not: null },
+        },
+      }),
+    ])
+
     return NextResponse.json(
       {
         ok: true,
         service: 'dorgham-cnc-api',
         runtime: 'next',
         db: true,
+        catalog: {
+          published: productCount,
+          indexed: indexedCount,
+        },
       },
       {
         headers: {

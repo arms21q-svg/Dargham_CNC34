@@ -25,11 +25,13 @@ import {
   loadSiteDataFresh,
   loginWithApi,
   publishSiteData,
+  purgeStaleClientCache,
   saveSiteDataLocal,
   setAdminRole,
   setAdminSessionCookie,
   setAuthToken,
 } from '../utils/siteDataStorage'
+import { readBootstrapSiteData } from '../utils/siteBootstrap'
 
 interface SiteDataContextType {
   siteData: SiteData
@@ -78,8 +80,14 @@ function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
 }
 
 export function SiteDataProvider({ children }: { children: ReactNode }) {
-  const [siteData, setSiteData] = useState<SiteData>(() => createDefaultSiteData())
-  const [loading, setLoading] = useState(true)
+  const [siteData, setSiteData] = useState<SiteData>(() => {
+    if (typeof window === 'undefined') return createDefaultSiteData()
+    return readBootstrapSiteData() ?? createDefaultSiteData()
+  })
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return !readBootstrapSiteData()
+  })
   const [authReady, setAuthReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRoleState] = useState<string | null>(null)
@@ -87,7 +95,9 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   // Hydrate auth before children's useEffect redirects (layout effects run parent→… wait: child-first).
   // Parent useLayoutEffect still runs before child's useEffect, which stops the login↔admin loop.
   useLayoutEffect(() => {
-    // Auth only — site content comes from API to avoid stale localStorage flash on Vercel
+    purgeStaleClientCache()
+
+    // Auth only — public pages hydrate from SSR bootstrap + API refresh
     const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
     if (flagged && isVercelHost() && !getAuthToken()) {
       sessionStorage.removeItem(ADMIN_AUTH_KEY)

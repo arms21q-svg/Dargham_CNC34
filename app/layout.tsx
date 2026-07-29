@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import Providers from '@/components/Providers'
 import {
   absoluteUrl,
@@ -118,7 +120,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="" />
-        <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
         <link rel="preconnect" href={absoluteUrl('/')} />
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
@@ -126,6 +127,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen antialiased">
         <Providers>{children}</Providers>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

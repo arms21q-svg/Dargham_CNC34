@@ -1,33 +1,12 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-
-const SECURITY_HEADERS: Record<string, string> = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'SAMEORIGIN',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
-  'X-DNS-Prefetch-Control': 'on',
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Resource-Policy': 'cross-origin',
-  'Origin-Agent-Cluster': '?1',
-  'Content-Security-Policy': [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
-    "font-src 'self'",
-    "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co wss://*.supabase.co",
-    "frame-ancestors 'self'",
-    "base-uri 'self'",
-    "form-action 'self' https://wa.me https://api.whatsapp.com",
-  ].join('; '),
-}
+import { buildSecurityHeaders } from './csp'
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const response = NextResponse.next()
 
-  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+  for (const [key, value] of Object.entries(buildSecurityHeaders())) {
     response.headers.set(key, value)
   }
 

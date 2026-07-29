@@ -29,23 +29,9 @@ export default function HeroSlider({ side = false }: HeroSliderProps) {
   useEffect(() => {
     if (slideImages.length <= 1) return
 
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout>
-
-    const tick = () => {
-      timer = setTimeout(() => {
-        if (cancelled) return
-        goNext()
-        tick()
-      }, 4500)
-    }
-
-    tick()
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [slideImages.length, goNext, current])
+    const timer = window.setInterval(goNext, 4500)
+    return () => window.clearInterval(timer)
+  }, [slideImages.length, goNext])
 
   const onTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0]

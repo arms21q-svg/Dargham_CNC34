@@ -73,7 +73,11 @@ export default function HomePage() {
             </div>
 
             {loading ? (
-              <WorksCatalogSkeleton count={4} desktopCols={4} />
+              featured.length > 0 ? (
+                <WorksCatalogGrid products={featured} desktopCols={4} />
+              ) : (
+                <WorksCatalogSkeleton count={4} desktopCols={4} />
+              )
             ) : (
               <WorksCatalogGrid products={featured} desktopCols={4} />
             )}

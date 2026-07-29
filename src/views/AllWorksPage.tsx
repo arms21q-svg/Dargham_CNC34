@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import WorksCatalogGrid from '../components/WorksCatalogGrid'
 import WorksSearchBar, { type WorksImageSearchResult } from '../components/WorksSearchBar'
 import WorksSearchResultCard from '../components/WorksSearchResultCard'
 import { categoryLabels, type Category, type Product } from '../data/content'
+import { apiUrl } from '../utils/apiBase'
 import { searchProductsByText } from '../utils/productTextSearch'
 import { publicProducts } from '../utils/publicProducts'
 import { useApp } from '../context/AppContext'
@@ -28,6 +29,11 @@ export default function AllWorksPage() {
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [imageSearch, setImageSearch] = useState<WorksImageSearchResult | null>(null)
+
+  // Warm serverless runtime before first image search (reduces cold-start delay)
+  useEffect(() => {
+    void fetch(apiUrl('/api/health'), { cache: 'no-store' }).catch(() => {})
+  }, [])
 
   const catalog = useMemo(() => publicProducts(siteData.products), [siteData.products])
 

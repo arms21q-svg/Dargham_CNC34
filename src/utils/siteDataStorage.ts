@@ -3,6 +3,7 @@ import {
   createDefaultSiteData,
   DEFAULT_ADMIN_EMAIL,
 } from '../data/defaultSiteData'
+import { stripHeavyEmbeddedMedia } from './lightSiteData'
 import { apiUrl } from './apiBase'
 
 export const SITE_DATA_KEY = 'dorgham-cnc-site-data'
@@ -160,8 +161,12 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 }
 
 async function loadFromApi(defaults: SiteData): Promise<SiteData | null> {
+  const token = getAuthToken()
   const res = await fetchWithTimeout(apiUrl('/api/site-data'), {
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   })
   if (!res?.ok) return null
   try {
@@ -212,7 +217,7 @@ export async function loadSiteData(): Promise<SiteData> {
 
   const apiData = await loadFromApi(defaults)
   if (apiData) {
-    return preserveAdminCredentials(apiData, [defaults, apiData])
+    return preserveAdminCredentials(stripHeavyEmbeddedMedia(apiData), [defaults, apiData])
   }
 
   const localData = loadFromLocalStorage(defaults)
@@ -226,15 +231,14 @@ export async function loadSiteData(): Promise<SiteData> {
 
 export function saveSiteDataLocal(data: SiteData) {
   try {
-    const payload = {
+    const payload = stripHeavyEmbeddedMedia({
       ...data,
       updatedAt: data.updatedAt ?? Date.now(),
       settings: {
         ...data.settings,
-        // Do not persist plaintext passwords as a fake "default" — publish must not reset them.
         adminPassword: data.settings.adminPassword?.trim() || '',
       },
-    }
+    })
 
     localStorage.setItem(SITE_DATA_KEY, JSON.stringify(payload))
     return true

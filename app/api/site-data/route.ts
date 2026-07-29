@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { getCachedSiteData } from '@server/cachedSiteData'
+import { lightPublicSiteData } from '@server/lightSiteData'
 import { scheduleProductImageReindex } from '@server/imageIndex'
 import { syncSiteDataToDb } from '@server/syncSiteData'
 import { verifyBearerHeader } from '@server/vercelAuth'
@@ -67,7 +68,7 @@ function errorMessage(error: unknown): string {
   return prismaError.message || 'فشل حفظ البيانات'
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const data = await fetchSiteData()
     if (!data) {
@@ -76,8 +77,13 @@ export async function GET() {
         { status: 404 }
       )
     }
+
+    const isAdmin = Boolean(verifyBearerHeader(req.headers.get('authorization')))
+    const sanitized = sanitizePublicSiteData(data)
+    const payload = isAdmin ? sanitized : lightPublicSiteData(sanitized)
+
     return NextResponse.json(
-      { ok: true, data: sanitizePublicSiteData(data) },
+      { ok: true, data: payload },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',

@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { buildContentSecurityPolicy } from './csp'
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -17,17 +18,7 @@ const securityHeaders = [
   { key: 'Origin-Agent-Cluster', value: '?1' },
   {
     key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self'",
-      "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co wss://*.supabase.co",
-      "frame-ancestors 'self'",
-      "base-uri 'self'",
-      "form-action 'self' https://wa.me https://api.whatsapp.com",
-    ].join('; '),
+    value: buildContentSecurityPolicy(),
   },
 ]
 

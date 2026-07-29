@@ -81,11 +81,11 @@ export async function searchProductsByImage(
     ;({ base64, mimeType } = await prepareImageFile(file, 320, 0.7))
   }
 
-  // Cap client wait so the UI never hangs on a stuck serverless cold start
+  // Cap client wait — allow cold start on serverless (first search can be slower)
   const controller = new AbortController()
   const onAbort = () => controller.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
-  const timer = setTimeout(() => controller.abort(), 8_000)
+  const timer = setTimeout(() => controller.abort(), 14_000)
 
   let res: Response
   try {

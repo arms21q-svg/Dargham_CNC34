@@ -138,7 +138,14 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
       resetLocal()
       onClose()
     } catch (err) {
-      if ((err as Error)?.name === 'AbortError') return
+      if ((err as Error)?.name === 'AbortError') {
+        setError(
+          lang === 'ar'
+            ? 'انتهت مهلة البحث — أعد المحاولة (قد يستغرق أول بحث وقتاً أطول).'
+            : 'Search timed out — try again (first search may take longer).'
+        )
+        return
+      }
       setError(lang === 'ar' ? 'تعذر البحث في قاعدة البيانات. حاول مجدداً.' : 'Database search failed. Try again.')
     } finally {
       setLoading(false)

@@ -17,8 +17,12 @@ const corsOrigins = process.env.CORS_ORIGIN
 app.use(compression({ threshold: 1024 }))
 app.use(
   cors({
-    // Same-origin on Vercel works; when unset allow all (needed for admin publish)
-    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    origin:
+      corsOrigins.length > 0
+        ? corsOrigins
+        : isProd
+          ? false
+          : true,
     credentials: true,
   })
 )

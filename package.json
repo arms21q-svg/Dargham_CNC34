@@ -17,6 +17,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx server/seed.ts",
+    "admin:reset": "tsx scripts/resetAdminPassword.ts",
     "db:setup": "prisma db push",
     "postdb:setup": "tsx server/seed.ts",
     "icons:generate": "node scripts/generate-icons.mjs"

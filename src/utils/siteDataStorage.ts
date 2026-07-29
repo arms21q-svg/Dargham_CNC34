@@ -160,7 +160,9 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 }
 
 async function loadFromApi(defaults: SiteData): Promise<SiteData | null> {
-  const res = await fetchWithTimeout(apiUrl('/api/site-data'))
+  const res = await fetchWithTimeout(apiUrl('/api/site-data'), {
+    headers: { Accept: 'application/json' },
+  })
   if (!res?.ok) return null
   try {
     const json = (await res.json()) as { ok: boolean; data: SiteData }
@@ -174,8 +176,8 @@ async function loadFromApi(defaults: SiteData): Promise<SiteData | null> {
 }
 
 async function loadFromJson(defaults: SiteData): Promise<SiteData | null> {
-  // No cache-bust — allow CDN/browser cache of site-data.json
-  const res = await fetchWithTimeout('/site-data.json', {
+  const res = await fetchWithTimeout(`/site-data.json?v=${Date.now()}`, {
+    cache: 'no-store',
     headers: { Accept: 'application/json' },
   })
   if (!res?.ok) return null
@@ -203,18 +205,17 @@ function loadFromLocalStorage(defaults: SiteData): SiteData | null {
 }
 
 /**
- * Stale-while-revalidate style loader:
- * Prefer API, then static JSON, then localStorage — without parallel waste on mobile.
+ * Prefer live API data; use static JSON / localStorage only as offline fallback.
  */
 export async function loadSiteData(): Promise<SiteData> {
   const defaults = createDefaultSiteData()
-  const localData = loadFromLocalStorage(defaults)
 
   const apiData = await loadFromApi(defaults)
   if (apiData) {
-    return preserveAdminCredentials(apiData, [defaults, localData, apiData].filter(Boolean) as SiteData[])
+    return preserveAdminCredentials(apiData, [defaults, apiData])
   }
 
+  const localData = loadFromLocalStorage(defaults)
   const jsonData = await loadFromJson(defaults)
   const candidates = [jsonData, localData].filter((data): data is SiteData => data !== null)
 
@@ -393,6 +394,7 @@ export async function publishSiteData(
     try {
       const res = await fetchWithTimeout(apiUrl('/api/site-data'), {
         method: 'PUT',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,

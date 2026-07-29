@@ -1,8 +1,14 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import WorksImageSearch, { type WorksImageSearchResult } from './WorksImageSearch'
 import { useApp } from '../context/AppContext'
+import type { WorksImageSearchResult } from './WorksImageSearch'
+
+const WorksImageSearch = dynamic(() => import('./WorksImageSearch'), {
+  ssr: false,
+  loading: () => null,
+})
 
 export type { WorksImageSearchResult }
 
@@ -97,17 +103,19 @@ export default function WorksSearchBar({
         </div>
       </div>
 
-      <div id="works-image-search-panel">
-        <WorksImageSearch
-          open={imagePanelOpen}
-          onClose={() => setImagePanelOpen(false)}
-          onResult={(result) => {
-            onImageResult(result)
-            onSearchChange('')
-            setImagePanelOpen(false)
-          }}
-        />
-      </div>
+      {(imagePanelOpen || imageSearch) && (
+        <div id="works-image-search-panel">
+          <WorksImageSearch
+            open={imagePanelOpen}
+            onClose={() => setImagePanelOpen(false)}
+            onResult={(result) => {
+              onImageResult(result)
+              onSearchChange('')
+              setImagePanelOpen(false)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

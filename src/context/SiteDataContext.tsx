@@ -14,7 +14,6 @@ import type { HomeSettings, ContactSettings } from '../types/siteData'
 import {
   createDefaultSiteData,
   DEFAULT_ADMIN_EMAIL,
-  DEFAULT_ADMIN_PASSWORD,
 } from '../data/defaultSiteData'
 import {
   ADMIN_AUTH_KEY,
@@ -22,7 +21,6 @@ import {
   getAdminRole,
   isSuperAdminSession,
   isVercelHost,
-  loadFromLocalStorageSync,
   loadSiteData,
   loginWithApi,
   publishSiteData,
@@ -88,9 +86,7 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
   // Hydrate auth before children's useEffect redirects (layout effects run parent→… wait: child-first).
   // Parent useLayoutEffect still runs before child's useEffect, which stops the login↔admin loop.
   useLayoutEffect(() => {
-    const local = loadFromLocalStorageSync()
-    if (local) setSiteData(local)
-
+    // Auth only — site content comes from API to avoid stale localStorage flash on Vercel
     const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
     if (flagged && isVercelHost() && !getAuthToken()) {
       sessionStorage.removeItem(ADMIN_AUTH_KEY)
@@ -114,7 +110,10 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
 
     loadSiteData()
       .then((data) => {
-        if (!cancelled) setSiteData(data)
+        if (!cancelled) {
+          setSiteData(data)
+          saveSiteDataLocal(data)
+        }
       })
       .catch(() => {
         /* keep local/defaults */
@@ -148,8 +147,8 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       return { ok: true }
     }
 
-    // On Vercel publishing requires an API JWT — never accept local-only login
-    if (isVercelHost()) {
+    // Offline login only in local development without Vercel/API
+    if (process.env.NODE_ENV !== 'development' || isVercelHost()) {
       return {
         ok: false,
         error:
@@ -158,14 +157,13 @@ export function SiteDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // fallback بدون قاعدة بيانات (تطوير / cPanel فقط)
     const expectedEmail = (siteData.settings.adminEmail || DEFAULT_ADMIN_EMAIL)
       .trim()
       .toLowerCase()
-    const expectedPassword = siteData.settings.adminPassword || DEFAULT_ADMIN_PASSWORD
+    const expectedPassword = siteData.settings.adminPassword?.trim()
     const inputEmail = email.trim().toLowerCase()
 
-    if (inputEmail === expectedEmail && password === expectedPassword) {
+    if (expectedPassword && inputEmail === expectedEmail && password === expectedPassword) {
       sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
       setAdminSessionCookie(true)
       setAdminRole('super')

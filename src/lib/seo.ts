@@ -197,6 +197,7 @@ export function creativeWorkSchema(opts: {
 }
 
 export function autoImageAlt(src: string, fallback: string): string {
+  if (fallback === '') return ''
   const cleaned = fallback?.trim()
   if (cleaned) return cleaned
   try {

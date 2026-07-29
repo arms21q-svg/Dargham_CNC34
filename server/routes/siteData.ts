@@ -43,7 +43,7 @@ router.get('/', async (_req, res) => {
       res.status(404).json({ ok: false, error: 'لا توجد بيانات. شغّل: npm run db:seed' })
       return
     }
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120')
+    res.setHeader('Cache-Control', 'no-store, must-revalidate')
     res.json({ ok: true, data: sanitizePublicSiteData(data) })
   } catch (error) {
     console.error('GET site-data error:', error)

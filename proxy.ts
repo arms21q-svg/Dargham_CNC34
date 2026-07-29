@@ -8,6 +8,19 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
   'X-DNS-Prefetch-Control': 'on',
   'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
+  'Origin-Agent-Cluster': '?1',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self'",
+    "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co wss://*.supabase.co",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self' https://wa.me https://api.whatsapp.com",
+  ].join('; '),
 }
 
 export function proxy(request: NextRequest) {

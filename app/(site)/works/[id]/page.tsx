@@ -12,8 +12,8 @@ import { getProductById } from '@server/productDetail'
 
 type Props = { params: Promise<{ id: string }> }
 
-/** ISR: reuse HTML/RSC for identical products for ~2 minutes. */
-export const revalidate = 120
+/** ISR with on-demand invalidation via revalidateTag('products') on admin publish. */
+export const revalidate = 60
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params

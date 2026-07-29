@@ -1,7 +1,7 @@
 import './loadEnv.js'
 import bcrypt from 'bcryptjs'
 import { prisma } from './db'
-import { createDefaultSiteData } from '../src/data/defaultSiteData'
+import { createDefaultSiteData, DEFAULT_ADMIN_EMAIL } from '../src/data/defaultSiteData'
 import {
   configFromSiteData,
   managerFromSiteData,
@@ -9,9 +9,24 @@ import {
 } from './mappers'
 import { ensureSuperAdminSeeded } from './utils/adminUsers'
 
+function resolveSeedAdmin() {
+  const email = (process.env.SEED_ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase()
+  const password = process.env.SEED_ADMIN_PASSWORD?.trim()
+  if (!password || password.length < 8) {
+    throw new Error(
+      'Set SEED_ADMIN_PASSWORD (min 8 chars) in .env before running db:seed'
+    )
+  }
+  return { email, password }
+}
+
 async function main() {
+  const { email, password } = resolveSeedAdmin()
   const defaults = createDefaultSiteData()
-  const passwordHash = await bcrypt.hash(defaults.settings.adminPassword, 10)
+  defaults.settings.adminEmail = email
+  defaults.settings.adminPassword = ''
+
+  const passwordHash = await bcrypt.hash(password, 10)
   const configData = configFromSiteData(defaults, passwordHash)
 
   await prisma.siteConfig.upsert({
@@ -20,7 +35,7 @@ async function main() {
     update: configData,
   })
 
-  await ensureSuperAdminSeeded(defaults.settings.adminEmail, passwordHash)
+  await ensureSuperAdminSeeded(email, passwordHash)
 
   await prisma.product.deleteMany()
   await prisma.manager.deleteMany()
@@ -38,7 +53,7 @@ async function main() {
   }
 
   console.log('Database seeded successfully')
-  console.log(`Admin: ${defaults.settings.adminEmail}`)
+  console.log(`Admin email: ${email}`)
 }
 
 main()

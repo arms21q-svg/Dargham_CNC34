@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
+import { getCachedSiteData } from '@server/cachedSiteData'
 import { scheduleProductImageReindex } from '@server/imageIndex'
 import { syncSiteDataToDb } from '@server/syncSiteData'
 import { verifyBearerHeader } from '@server/vercelAuth'
@@ -7,7 +8,6 @@ import type { SiteData } from '@/types/siteData'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
-
 const MAX_BODY_CHARS = 3_500_000
 
 function sanitizePublicSiteData(data: SiteData): SiteData {
@@ -22,16 +22,8 @@ function sanitizePublicSiteData(data: SiteData): SiteData {
 }
 
 async function fetchSiteData() {
-  const [config, products, managers] = await Promise.all([
-    prisma.siteConfig.findUnique({ where: { id: 1 } }),
-    prisma.product.findMany({ orderBy: { sortOrder: 'asc' } }),
-    prisma.manager.findMany({ orderBy: { sortOrder: 'asc' } }),
-  ])
-  if (!config) return null
-  const { toSiteData } = await import('@server/mappers')
-  return toSiteData(config, products, managers)
+  return getCachedSiteData()
 }
-
 async function parseBody(req: NextRequest): Promise<SiteData> {
   const text = await req.text()
   if (!text) throw new Error('جسم الطلب فارغ')
@@ -88,7 +80,7 @@ export async function GET() {
       { ok: true, data: sanitizePublicSiteData(data) },
       {
         headers: {
-          'Cache-Control': 'public, max-age=30, stale-while-revalidate=120',
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
         },
       }
     )
@@ -143,10 +135,10 @@ export async function PUT(req: NextRequest) {
     }
 
     try {
-      const { revalidateTag } = await import('next/cache')
-      revalidateTag('products', 'max')
+      const { revalidatePublishedSite } = await import('@server/revalidateSite')
+      await revalidatePublishedSite()
     } catch (cacheErr) {
-      console.warn('product cache revalidate skipped', cacheErr)
+      console.warn('site cache revalidate skipped', cacheErr)
     }
 
     return NextResponse.json({
@@ -156,6 +148,10 @@ export async function PUT(req: NextRequest) {
       meta: {
         changedProducts: sync.changedProducts,
         changedManagers: sync.changedManagers,
+      },
+    }, {
+      headers: {
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error) {

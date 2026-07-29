@@ -80,12 +80,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('update-credentials error', error)
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : 'فشل تحديث بيانات الدخول',
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ ok: false, error: 'فشل تحديث بيانات الدخول' }, { status: 500 })
   }
 }

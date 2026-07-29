@@ -48,7 +48,8 @@ function Header() {
             <Link
               key={link.to}
               href={link.to}
-              prefetch
+              prefetch={link.to === '/' || link.to === '/works' || link.to === '/contact'}
+              aria-current={isActive(link.to) ? 'page' : undefined}
               className={`relative rounded-lg px-2.5 py-2 text-xs font-medium transition-colors duration-200 lg:px-3 lg:text-sm ${
                 isActive(link.to)
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
@@ -69,9 +70,14 @@ function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <button type="button" onClick={toggleTheme} className="btn-ghost !p-2" aria-label="Toggle theme">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="btn-ghost !p-2"
+            aria-label={lang === 'ar' ? 'تبديل الوضع الليلي' : 'Toggle theme'}
+          >
             {isDark ? (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -80,7 +86,7 @@ function Header() {
                 />
               </svg>
             ) : (
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -95,6 +101,7 @@ function Header() {
             type="button"
             onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
             className="btn-ghost !px-3 !py-2 text-sm font-semibold"
+            aria-label={lang === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
           >
             {lang === 'ar' ? 'EN' : 'عربي'}
           </button>

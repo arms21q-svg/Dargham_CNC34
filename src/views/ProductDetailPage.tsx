@@ -89,9 +89,7 @@ export default function ProductDetailPage({
     let cancelled = false
 
     const loadRelated = () => {
-      void fetch(apiUrl(`/api/products/${encodeURIComponent(product.id)}/related`), {
-        cache: 'force-cache',
-      })
+      void fetch(apiUrl(`/api/products/${encodeURIComponent(product.id)}/related`))
         .then((res) => (res.ok ? res.json() : null))
         .then((json: { products?: InitialProduct[] } | null) => {
           if (cancelled || !json?.products?.length) return

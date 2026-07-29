@@ -144,7 +144,7 @@
   ],
   "managers": [],
   "settings": {
-    "adminEmail": "admin@dorghamcnc.com",
-    "adminPassword": "dorgham2026"
+    "adminEmail": "",
+    "adminPassword": ""
   }
 }

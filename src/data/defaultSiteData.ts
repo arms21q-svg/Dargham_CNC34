@@ -1,8 +1,7 @@
 import { products, slideImages, translations } from './content'
 import type { AboutSettings, SiteData } from '../types/siteData'
 
-export const DEFAULT_ADMIN_EMAIL = 'admin@dorghamcnc.com'
-export const DEFAULT_ADMIN_PASSWORD = 'dorgham2026'
+export const DEFAULT_ADMIN_EMAIL = 'admin@dhirghamcnc.com'
 
 export const DEFAULT_ABOUT_IMAGE =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80'
@@ -72,7 +71,7 @@ export function createDefaultSiteData(): SiteData {
     managers: [],
     settings: {
       adminEmail: DEFAULT_ADMIN_EMAIL,
-      adminPassword: DEFAULT_ADMIN_PASSWORD,
+      adminPassword: '',
     },
   }
 }

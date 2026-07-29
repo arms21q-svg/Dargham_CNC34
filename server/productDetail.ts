@@ -74,7 +74,7 @@ export async function getProductById(id: string): Promise<ProductDetailRow | nul
 
   try {
     return await unstable_cache(() => fetchProductById(id), ['product-detail', id], {
-      revalidate: 120,
+      revalidate: 60,
       tags: ['products', `product:${id}`],
     })()
   } catch {
@@ -102,7 +102,7 @@ export async function getRelatedProducts(
           take: limit,
         }),
       ['product-related', id, category, String(limit)],
-      { revalidate: 120, tags: ['products', `product:${id}`] }
+      { revalidate: 60, tags: ['products', `product:${id}`] }
     )()
   } catch {
     return []

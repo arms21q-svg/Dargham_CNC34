@@ -109,8 +109,11 @@ export default function ContactPage() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="form-label">{t.contact.name}</label>
+                  <label className="form-label" htmlFor="contact-name">
+                    {t.contact.name}
+                  </label>
                   <input
+                    id="contact-name"
                     type="text"
                     required
                     className="input-field"
@@ -119,8 +122,11 @@ export default function ContactPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">{t.contact.email}</label>
+                  <label className="form-label" htmlFor="contact-email">
+                    {t.contact.email}
+                  </label>
                   <input
+                    id="contact-email"
                     type="email"
                     className="input-field"
                     value={form.email}
@@ -129,8 +135,11 @@ export default function ContactPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">{t.contact.phone}</label>
+                  <label className="form-label" htmlFor="contact-phone">
+                    {t.contact.phone}
+                  </label>
                   <input
+                    id="contact-phone"
                     type="tel"
                     className="input-field"
                     value={form.phone}
@@ -138,8 +147,11 @@ export default function ContactPage() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">{t.contact.message}</label>
+                  <label className="form-label" htmlFor="contact-message">
+                    {t.contact.message}
+                  </label>
                   <textarea
+                    id="contact-message"
                     required
                     rows={5}
                     className="input-field resize-none"

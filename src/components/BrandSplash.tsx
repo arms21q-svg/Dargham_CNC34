@@ -21,6 +21,8 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
   useEffect(() => {
     if (skip) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (sessionStorage.getItem('dorgham-splash-seen') === '1') return
+    sessionStorage.setItem('dorgham-splash-seen', '1')
     setPhase('show')
   }, [skip])
 
@@ -86,14 +88,14 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
               width={512}
               height={512}
               decoding="async"
-              fetchPriority="high"
+              fetchPriority="auto"
               className="brand-splash__logo"
               draggable={false}
             />
           </picture>
         </div>
 
-        <h1 className="brand-splash__title">مرحبًا بكم في ضرغام CNC</h1>
+        <p className="brand-splash__title">مرحبًا بكم في ضرغام CNC</p>
 
         <p className="brand-splash__desc">
           نبدع في فن النحت والحفر بتقنية CNC على جميع أنواع الخشب، والتفلون، والبلاستيك،

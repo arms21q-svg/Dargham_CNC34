@@ -10,6 +10,7 @@ import {
   writeAdminAuditLog,
 } from '@server/utils/adminUsers'
 import { readJsonBody, verifyBearerHeader } from '@server/vercelAuth'
+import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 
 export const maxDuration = 30
 export const runtime = 'nodejs'
@@ -67,14 +68,14 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     console.error('admin-users GET error', error)
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : 'فشل العملية' },
-      { status: 500 }
-    )
+    return NextResponse.json({ ok: false, error: 'فشل العملية' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(`admin-users:${clientIp(req)}`, 20, 60_000)
+  if (!limited.ok) return rateLimitResponse(limited.retryAfter)
+
   try {
     const auth = verifyBearerHeader(req.headers.get('authorization'))
     if (!auth) {
@@ -285,9 +286,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('admin-users POST error', error)
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : 'فشل العملية' },
-      { status: 500 }
-    )
+    return NextResponse.json({ ok: false, error: 'فشل العملية' }, { status: 500 })
   }
 }

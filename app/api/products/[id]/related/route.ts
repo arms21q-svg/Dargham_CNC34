@@ -3,7 +3,7 @@ import { getProductById, getRelatedProducts } from '@server/productDetail'
 
 export const runtime = 'nodejs'
 export const maxDuration = 10
-export const revalidate = 120
+export const revalidate = 60
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -27,7 +27,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     { ok: true, products },
     {
       headers: {
-        'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
       },
     }
   )

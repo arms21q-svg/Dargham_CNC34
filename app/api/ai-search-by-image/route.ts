@@ -3,7 +3,7 @@ import { parseImagePayload } from '@server/aiCore'
 import { clientIp, rateLimit, rateLimitResponse } from '@server/rateLimit'
 import { searchProductsByImageEmbeddings } from '@server/vectorSearch'
 
-export const maxDuration = 30
+export const maxDuration = 60
 export const runtime = 'nodejs'
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'])

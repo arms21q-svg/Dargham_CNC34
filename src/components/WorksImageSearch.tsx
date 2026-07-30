@@ -145,8 +145,8 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
       if ((err as Error)?.name === 'AbortError') {
         setError(
           lang === 'ar'
-            ? 'انتهت مهلة البحث — أعد المحاولة (قد يستغرق أول بحث وقتاً أطول).'
-            : 'Search timed out — try again (first search may take longer).'
+            ? 'انتهت مهلة البحث. انتظر 10–20 ثانية بعد فتح صفحة الأعمال (فهرسة الصور) ثم أعد المحاولة.'
+            : 'Search timed out. Wait 10–20s after opening Works (image indexing), then retry.'
         )
         return
       }

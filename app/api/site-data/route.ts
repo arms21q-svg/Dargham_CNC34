@@ -144,6 +144,7 @@ export async function PUT(req: NextRequest) {
         const indexResult = await ensureProductImageIndex({
           forceIds: sync.needsReindex,
           limit: 120,
+          deadline: Date.now() + 25_000,
         })
         console.info('[publish] image index', indexResult)
       } catch (indexErr) {
@@ -151,8 +152,7 @@ export async function PUT(req: NextRequest) {
         scheduleProductImageReindex(sync.needsReindex)
       }
     } else {
-      // Ensure catalog is indexed even when URLs did not change (first deploy / missed index)
-      void ensureProductImageIndex({ limit: 40 }).catch(() => {})
+      void ensureProductImageIndex({ limit: 40, deadline: Date.now() + 15_000 }).catch(() => {})
     }
 
     try {

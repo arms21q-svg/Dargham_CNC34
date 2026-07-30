@@ -188,9 +188,9 @@ export async function featuresFromBase64(
 export async function featuresFromBuffer(input: Buffer): Promise<VisualFeatures | null> {
   try {
     // One decode → tiny RGB grid; derive aHash from luminance of same pixels (fast)
-    const { data } = await sharp(input)
+    const { data } = await sharp(input, { failOn: 'none', sequentialRead: true })
       .rotate()
-      .resize(VECTOR_SIZE, VECTOR_SIZE, { fit: 'fill' })
+      .resize(VECTOR_SIZE, VECTOR_SIZE, { fit: 'fill', fastShrinkOnLoad: true })
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true })
@@ -256,16 +256,6 @@ export async function countIndexedPublishedProducts(): Promise<{
     }),
   ])
   return { published, indexed }
-}
-
-/** Index missing vectors before search — fixes empty catalog after deploy. */
-export async function ensureCatalogReadyForSearch(): Promise<{ indexed: number; failed: number }> {
-  const { published, indexed } = await countIndexedPublishedProducts()
-  if (published === 0 || indexed >= published) {
-    return { indexed: 0, failed: 0 }
-  }
-  console.info('[image-index] catalog gap — indexing', { published, indexed })
-  return ensureProductImageIndex({ limit: 120 })
 }
 
 /** Admin/publish only — never call from search. */
@@ -459,8 +449,6 @@ export async function searchByVisualFeatures(
     path: 'empty',
   }
 
-  await ensureCatalogReadyForSearch()
-
   const featStarted = Date.now()
   const query = await featuresFromBase64(queryBase64, mimeType)
   timings.featuresMs = Date.now() - featStarted
@@ -519,10 +507,12 @@ export async function searchByVisualFeatures(
   return { matches, timings }
 }
 
-/** Index products missing vectors (publish / admin only — not on search). */
+/** Index products missing vectors (warmup / publish — not on the search hot path). */
 export async function ensureProductImageIndex(options?: {
   forceIds?: string[]
   limit?: number
+  /** Stop indexing after this timestamp (ms) to stay within serverless limits. */
+  deadline?: number
 }): Promise<{ indexed: number; failed: number }> {
   await ensurePgvectorSchema()
 
@@ -531,6 +521,7 @@ export async function ensureProductImageIndex(options?: {
     select: {
       id: true,
       image: true,
+      images: true,
       imageHash: true,
       imageVector: true,
       indexedAt: true,
@@ -552,23 +543,18 @@ export async function ensureProductImageIndex(options?: {
   let indexed = 0
   let failed = 0
 
-  for (const p of needs) {
+  async function indexOne(p: (typeof needs)[0]): Promise<'ok' | 'fail'> {
     try {
       const src = pickIndexableImageSource(p)
-      if (!src) {
-        failed += 1
-        continue
-      }
+      if (!src) return 'fail'
 
       const feats =
         src.startsWith('/api/products/') || (!src.startsWith('data:') && !src.startsWith('http'))
           ? await featuresFromProductId(p.id)
           : await featuresFromImageUrl(src)
 
-      if (!feats) {
-        failed += 1
-        continue
-      }
+      if (!feats) return 'fail'
+
       await prisma.product.update({
         where: { id: p.id },
         data: {
@@ -578,10 +564,22 @@ export async function ensureProductImageIndex(options?: {
         },
       })
       await persistEmbedding(p.id, feats.vector)
-      indexed += 1
+      return 'ok'
     } catch (err) {
-      failed += 1
       console.warn('[image-index] product', p.id, err instanceof Error ? err.message : err)
+      return 'fail'
+    }
+  }
+
+  const BATCH = 3
+  for (let i = 0; i < needs.length; i += BATCH) {
+    if (options?.deadline && Date.now() >= options.deadline) break
+
+    const batch = needs.slice(i, i + BATCH)
+    const results = await Promise.all(batch.map((p) => indexOne(p)))
+    for (const r of results) {
+      if (r === 'ok') indexed += 1
+      else failed += 1
     }
   }
 

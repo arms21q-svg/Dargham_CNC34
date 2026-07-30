@@ -85,8 +85,8 @@ export async function searchProductsByImage(
   const controller = new AbortController()
   const onAbort = () => controller.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
-  // Allow first search after cold start + auto-indexing
-  const timer = setTimeout(() => controller.abort(), 28_000)
+  // Search only — indexing runs via /api/image-search/warmup or admin publish
+  const timer = setTimeout(() => controller.abort(), 45_000)
 
   let res: Response
   try {

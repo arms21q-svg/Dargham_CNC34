@@ -24,6 +24,7 @@ import {
   loadSiteData,
   loadSiteDataFresh,
   loginWithApi,
+  mergePublishPayload,
   publishSiteData,
   purgeStaleClientCache,
   saveSiteDataLocal,
@@ -279,7 +280,12 @@ export function SiteDataProvider({
   }, [siteData])
 
   const publish = useCallback(async () => {
-    const result = await publishSiteData(siteData)
+    let payload = siteData
+    if (getAuthToken()) {
+      const fresh = await loadSiteDataFresh()
+      payload = mergePublishPayload(siteData, fresh)
+    }
+    const result = await publishSiteData(payload)
     if (result.ok) {
       const fresh = await loadSiteDataFresh()
       setSiteData(fresh)

@@ -157,6 +157,67 @@ function pickNewest(...candidates: SiteData[]): SiteData {
   )
 }
 
+/** Admin publish needs embedded base64; public clients use /api/.../image proxy URLs. */
+function normalizeClientSiteData(result: SiteData, defaults: SiteData): SiteData {
+  const merged = preserveAdminCredentials(result, [defaults, result])
+  if (getAuthToken()) return merged
+  return stripHeavyEmbeddedMedia(merged)
+}
+
+function isProxyProductImage(url: string | undefined): boolean {
+  return Boolean(url?.startsWith('/api/products/'))
+}
+
+function isProxySlideImage(url: string | undefined): boolean {
+  return Boolean(url?.startsWith('/api/site/slides/'))
+}
+
+/** Restore DB media when the admin UI still holds public proxy URLs from bootstrap. */
+export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData {
+  const storedById = new Map(stored.products.map((p) => [p.id, p]))
+  const products = local.products.map((p) => {
+    const db = storedById.get(p.id)
+    if (!db) return p
+
+    let image = p.image
+    let images = p.images ?? []
+
+    if (isProxyProductImage(p.image) && db.image && !isProxyProductImage(db.image)) {
+      image = db.image
+    }
+
+    const galleryProxy =
+      images.length === 0 || images.every((u) => !u || isProxyProductImage(u))
+    if (galleryProxy && db.images?.some((u) => u && !isProxyProductImage(u))) {
+      images = db.images
+    } else {
+      images = images.map((u, i) => {
+        const storedUrl = db.images?.[i]
+        if (isProxyProductImage(u) && storedUrl && !isProxyProductImage(storedUrl)) {
+          return storedUrl
+        }
+        return u
+      })
+    }
+
+    return { ...p, image, images }
+  })
+
+  const slideImages = (local.home?.slideImages ?? []).map((url, index) => {
+    const storedUrl = stored.home?.slideImages?.[index]
+    if (isProxySlideImage(url) && storedUrl && !isProxySlideImage(storedUrl)) {
+      return storedUrl
+    }
+    return url
+  })
+
+  return {
+    ...local,
+    products,
+    home: { ...local.home, slideImages },
+  }
+}
+
 function preserveAdminCredentials(result: SiteData, candidates: SiteData[]): SiteData {
   const emailSource = candidates.find((c) => c.settings.adminEmail?.trim())
   // Never re-inject a default/plaintext password from defaults — empty means "unchanged on server".
@@ -248,7 +309,7 @@ export async function loadSiteData(): Promise<SiteData> {
 
   const apiData = await loadFromApi(defaults)
   if (apiData) {
-    return preserveAdminCredentials(stripHeavyEmbeddedMedia(apiData), [defaults, apiData])
+    return normalizeClientSiteData(apiData, defaults)
   }
 
   // Production: never show stale offline copies when the live API is unreachable
@@ -270,21 +331,22 @@ export async function loadSiteDataFresh(): Promise<SiteData> {
   const defaults = createDefaultSiteData()
   const apiData = await loadFromApi(defaults, true)
   if (apiData) {
-    return preserveAdminCredentials(stripHeavyEmbeddedMedia(apiData), [defaults, apiData])
+    return normalizeClientSiteData(apiData, defaults)
   }
   return loadSiteData()
 }
 
 export function saveSiteDataLocal(data: SiteData) {
   try {
-    const payload = stripHeavyEmbeddedMedia({
+    const draft = {
       ...data,
       updatedAt: data.updatedAt ?? Date.now(),
       settings: {
         ...data.settings,
         adminPassword: data.settings.adminPassword?.trim() || '',
       },
-    })
+    }
+    const payload = getAuthToken() ? draft : stripHeavyEmbeddedMedia(draft)
 
     localStorage.setItem(SITE_DATA_KEY, JSON.stringify(payload))
     return true

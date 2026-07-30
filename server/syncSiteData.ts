@@ -10,6 +10,39 @@ import type { SiteData } from '../src/types/siteData'
 type ProductRow = ReturnType<typeof productFromSiteData>
 type ManagerRow = ReturnType<typeof managerFromSiteData>
 
+function isProxyMediaUrl(url: string | undefined): boolean {
+  if (!url) return false
+  return url.startsWith('/api/products/') || url.startsWith('/api/site/slides/')
+}
+
+/** Never overwrite stored base64/URL with public proxy paths from a stripped client payload. */
+function preserveStoredMedia(incoming: string, stored: string): string {
+  if (incoming && !isProxyMediaUrl(incoming)) return incoming
+  if (stored && !isProxyMediaUrl(stored)) return stored
+  return incoming || stored
+}
+
+function preserveStoredGallery(incoming: string[], stored: string[]): string[] {
+  if (incoming.length === 0) return stored
+  const merged = incoming.map((url, i) => preserveStoredMedia(url, stored[i] ?? ''))
+  const hasRealIncoming = merged.some((u) => u && !isProxyMediaUrl(u))
+  if (!hasRealIncoming && stored.some((u) => u && !isProxyMediaUrl(u))) {
+    return stored
+  }
+  return merged.filter(Boolean)
+}
+
+function applyStoredProductMedia(
+  row: ProductRow,
+  prev: { image: string; images: string[] }
+): ProductRow {
+  return {
+    ...row,
+    image: preserveStoredMedia(row.image, prev.image),
+    images: preserveStoredGallery(row.images, prev.images),
+  }
+}
+
 function sameStringArray(a: string[] | undefined, b: string[] | undefined): boolean {
   const left = a ?? []
   const right = b ?? []
@@ -151,14 +184,17 @@ export async function syncSiteDataToDb(
 
   for (const p of products) {
     const prev = prevProductById.get(p.id)
+    const row = prev ? applyStoredProductMedia(p, prev) : p
     if (!prev) {
-      productsToCreate.push(p)
-      if (p.image) needsReindex.push(p.id)
+      productsToCreate.push(row)
+      if (row.image && !isProxyMediaUrl(row.image)) needsReindex.push(row.id)
       continue
     }
-    if (productContentEqual(prev, p)) continue
-    productsToUpdate.push(p)
-    if (prev.image !== p.image && p.image) needsReindex.push(p.id)
+    if (productContentEqual(prev, row)) continue
+    productsToUpdate.push(row)
+    if (prev.image !== row.image && row.image && !isProxyMediaUrl(row.image)) {
+      needsReindex.push(row.id)
+    }
   }
 
   const managersToCreate: ManagerRow[] = []

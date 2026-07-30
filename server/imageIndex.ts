@@ -541,7 +541,9 @@ export async function ensureProductImageIndex(options?: {
 
   const needs = products
     .filter((p) => {
-      if (options?.forceIds?.includes(p.id)) return Boolean(pickIndexableImageSource(p))
+      if (options?.forceIds?.length) {
+        return options.forceIds.includes(p.id) && Boolean(pickIndexableImageSource(p))
+      }
       const src = pickIndexableImageSource(p)
       if (!src) return false
       if (!p.imageHash || !p.imageVector || !p.indexedAt) return true
@@ -558,6 +560,13 @@ export async function ensureProductImageIndex(options?: {
       const src = pickIndexableImageSource(p)
       if (!src) {
         console.warn('[image-index] no image source', p.id)
+        return 'fail'
+      }
+      if (src.startsWith('/api/products/')) {
+        console.warn(
+          '[image-index] product image is a proxy URL only — re-upload image in admin',
+          p.id
+        )
         return 'fail'
       }
 

@@ -1,4 +1,5 @@
 import type { SiteData } from '../types/siteData'
+import { getAuthToken } from './siteDataStorage'
 
 const BOOTSTRAP_ID = '__SITE_DATA__'
 
@@ -33,4 +34,17 @@ export function resolveInitialSiteData(serverData?: SiteData | null): SiteData |
 
 export function isSiteDataNewer(next: SiteData, prev: SiteData): boolean {
   return (next.updatedAt ?? 0) > (prev.updatedAt ?? 0)
+}
+
+/** Authenticated sessions need full API media; equal updatedAt must not keep stripped bootstrap. */
+export function shouldApplyIncomingSiteData(incoming: SiteData, current: SiteData): boolean {
+  if (getAuthToken()) return true
+  if (isSiteDataNewer(incoming, current)) return true
+  return countCatalogImages(incoming) > countCatalogImages(current)
+}
+
+function countCatalogImages(data: SiteData): number {
+  return (data.products ?? []).filter(
+    (p) => Boolean(p.image?.trim()) || (p.images ?? []).some((url) => Boolean(url?.trim()))
+  ).length
 }

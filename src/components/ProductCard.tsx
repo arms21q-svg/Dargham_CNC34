@@ -4,6 +4,7 @@ import { memo, type ComponentProps } from 'react'
 import Link from 'next/link'
 import type { Product } from '../data/content'
 import { useApp } from '../context/AppContext'
+import { productCardImageSrc } from '../utils/productImage'
 import OptimizedImage from './OptimizedImage'
 
 type ProductPhotoProps = ComponentProps<typeof OptimizedImage>
@@ -38,6 +39,7 @@ function ProductCard({
 }: ProductCardProps) {
   const { lang, t, isSaved, toggleSave } = useApp()
   const saved = isSaved(product.id)
+  const imageSrc = productCardImageSrc(product)
 
   if (catalogMobile) {
     return (
@@ -50,7 +52,7 @@ function ProductCard({
         >
           <div className="relative aspect-square w-full overflow-hidden bg-black/40">
             <ProductPhoto
-              src={product.image}
+              src={imageSrc}
               alt={product.title[lang]}
               width={400}
               widths={[240, 320, 400]}
@@ -75,7 +77,7 @@ function ProductCard({
           <Link href={`/works/${product.id}`} prefetch={false} className="block">
             <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
               <ProductPhoto
-                src={product.image}
+                src={imageSrc}
                 alt={product.title[lang]}
                 width={480}
                 widths={[320, 400, 480]}
@@ -150,7 +152,7 @@ function ProductCard({
       <Link href={`/works/${product.id}`} prefetch={false} className="block">
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
           <ProductPhoto
-            src={product.image}
+            src={imageSrc}
             alt={product.title[lang]}
             width={480}
             widths={[240, 320, 400, 480]}

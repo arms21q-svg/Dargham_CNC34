@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { DEFAULT_ADMIN_EMAIL } from '../../data/defaultSiteData'
 import { useSiteData } from '../../context/SiteDataContext'
 
 export default function AdminLogin() {
   const { isAdmin, authReady, login } = useSiteData()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,8 +22,8 @@ export default function AdminLogin() {
 
   useEffect(() => {
     if (!authReady || !isAdmin) return
-    window.location.replace(nextPath)
-  }, [authReady, isAdmin, nextPath])
+    router.replace(nextPath)
+  }, [authReady, isAdmin, nextPath, router])
 
   if (!authReady || isAdmin) {
     return (
@@ -41,7 +42,6 @@ export default function AdminLogin() {
     setSubmitting(false)
 
     if (result.ok) {
-      window.location.assign(nextPath)
       return
     }
 

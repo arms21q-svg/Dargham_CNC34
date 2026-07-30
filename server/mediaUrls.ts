@@ -45,7 +45,8 @@ export function isServeableMediaUrl(url: string | undefined): boolean {
 }
 
 export function toPublicProductImage(productId: string, url: string, index = 0): string {
-  if (!url || isProxyMediaUrl(url)) return ''
+  if (!url) return ''
+  if (isProxyMediaUrl(url)) return productImageUrl(productId, index)
   if (isHeavyDataUrl(url)) return productImageUrl(productId, index)
   return url
 }

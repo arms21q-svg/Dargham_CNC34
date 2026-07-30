@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -32,7 +33,7 @@ import {
   setAdminSessionCookie,
   setAuthToken,
 } from '../utils/siteDataStorage'
-import { readBootstrapSiteData, isSiteDataNewer, resolveInitialSiteData } from '../utils/siteBootstrap'
+import { readBootstrapSiteData, shouldApplyIncomingSiteData, resolveInitialSiteData } from '../utils/siteBootstrap'
 
 interface SiteDataContextType {
   siteData: SiteData
@@ -95,6 +96,7 @@ export function SiteDataProvider({
   const [authReady, setAuthReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminRole, setAdminRoleState] = useState<string | null>(null)
+  const skipLocalSaveRef = useRef(false)
 
   // Hydrate auth before children's useEffect redirects (layout effects run parent→… wait: child-first).
   // Parent useLayoutEffect still runs before child's useEffect, which stops the login↔admin loop.
@@ -103,7 +105,7 @@ export function SiteDataProvider({
 
     const boot = readBootstrapSiteData()
     if (boot) {
-      setSiteData((prev) => (isSiteDataNewer(boot, prev) ? boot : prev))
+      setSiteData((prev) => (shouldApplyIncomingSiteData(boot, prev) ? boot : prev))
       setLoading(false)
     }
 
@@ -132,7 +134,7 @@ export function SiteDataProvider({
     loadSiteData()
       .then((data) => {
         if (!cancelled) {
-          setSiteData((prev) => (isSiteDataNewer(data, prev) ? data : prev))
+          setSiteData((prev) => (shouldApplyIncomingSiteData(data, prev) ? data : prev))
           saveSiteDataLocal(data)
         }
       })
@@ -149,8 +151,29 @@ export function SiteDataProvider({
   }, [])
 
   useEffect(() => {
+    if (!authReady || !isAdmin) return
+
+    let cancelled = false
+    loadSiteData()
+      .then((data) => {
+        if (!cancelled) {
+          setSiteData(data)
+          saveSiteDataLocal(data)
+        }
+      })
+      .catch(() => {
+        /* keep current */
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [authReady, isAdmin])
+
+  useEffect(() => {
     if (loading) return
     const timer = window.setTimeout(() => {
+      if (skipLocalSaveRef.current) return
       saveSiteDataLocal(siteData)
     }, 400)
     return () => window.clearTimeout(timer)
@@ -165,6 +188,7 @@ export function SiteDataProvider({
       setAdminRoleState(apiResult.role ?? getAdminRole())
       const fresh = await loadSiteData()
       setSiteData(fresh)
+      saveSiteDataLocal(fresh)
       return { ok: true }
     }
 
@@ -201,12 +225,22 @@ export function SiteDataProvider({
   }, [siteData.settings.adminEmail, siteData.settings.adminPassword])
 
   const logout = useCallback(() => {
+    skipLocalSaveRef.current = true
     sessionStorage.removeItem(ADMIN_AUTH_KEY)
     setAuthToken(null)
     setAdminRole(null)
     setAdminSessionCookie(false)
     setIsAdmin(false)
     setAdminRoleState(null)
+
+    void loadSiteData()
+      .then((data) => {
+        setSiteData(data)
+        saveSiteDataLocal(data)
+      })
+      .finally(() => {
+        skipLocalSaveRef.current = false
+      })
   }, [])
 
   const updateHome = useCallback((home: Partial<HomeSettings>) => {

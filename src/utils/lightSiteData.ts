@@ -28,7 +28,7 @@ function defaultSlideUrl(index: number): string {
 
 function resolveSlideImage(url: string | undefined, index: number): string {
   if (!url) return defaultSlideUrl(index)
-  if (isProxyMediaUrl(url)) return defaultSlideUrl(index)
+  if (isProxyMediaUrl(url)) return url
   if (isHeavyDataUrl(url)) return slideImageUrl(index)
   return url
 }
@@ -41,17 +41,12 @@ function resolveProductImage(product: Product, url: string | undefined, index: n
       : [gallery[index], url, product.image, ...gallery]
 
   for (const candidate of candidates) {
-    if (!candidate || isProxyMediaUrl(candidate)) continue
+    if (!candidate) continue
+    if (isProxyMediaUrl(candidate)) return candidate
     if (isHeavyDataUrl(candidate)) return productImageUrl(product.id, index)
     return candidate
   }
   return ''
-}
-
-function stripProxyFromProduct(product: Product): Product {
-  const image = isProxyMediaUrl(product.image) ? '' : product.image
-  const images = (product.images ?? []).filter((url) => url && !isProxyMediaUrl(url))
-  return { ...product, image, images }
 }
 
 /** Drop embedded base64 from public payloads — serve via /api/.../image instead. */
@@ -61,14 +56,14 @@ export function lightPublicSiteData(data: SiteData): SiteData {
   const products: Product[] = (data.products ?? []).map((p) => {
     const gallery = (p.images ?? []).filter(Boolean)
     const primarySource = p.image || gallery[0] || ''
-    const primary = resolveProductImage(p, primarySource, 0)
-    const images = gallery.map((url, index) => resolveProductImage(p, url, index))
+    const primary = resolveProductImage(p, primarySource, 0) || productImageUrl(p.id, 0)
+    const images = gallery.map((url, index) => resolveProductImage(p, url, index) || productImageUrl(p.id, index))
 
-    return stripProxyFromProduct({
+    return {
       ...p,
       image: primary,
       images: images.filter(Boolean),
-    })
+    }
   })
 
   return {

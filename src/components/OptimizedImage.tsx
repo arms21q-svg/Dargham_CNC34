@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useMemo, type ImgHTMLAttributes } from 'react'
 import { autoImageAlt } from '../lib/seo'
+import { apiUrl } from '../utils/apiBase'
 import { imageSrcSet, optimizeImageUrl } from '../utils/images'
 
 interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'srcSet' | 'src'> {
@@ -15,8 +16,13 @@ interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 
   widths?: number[]
 }
 
+function resolveImageSrc(src: string): string {
+  if (src.startsWith('/api/')) return apiUrl(src)
+  return src
+}
+
 function shouldUseNativeImg(src: string) {
-  return !src || src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('/')
+  return !src || src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('/') || src.includes('/api/products/')
 }
 
 /**
@@ -34,19 +40,20 @@ export default function OptimizedImage({
   className,
   ...rest
 }: OptimizedImageProps) {
+  const resolvedSrc = useMemo(() => resolveImageSrc(src), [src])
   const optimized = useMemo(
-    () => optimizeImageUrl(src, { width, quality: priority ? 78 : 65 }),
-    [src, width, priority]
+    () => optimizeImageUrl(resolvedSrc, { width, quality: priority ? 78 : 65 }),
+    [resolvedSrc, width, priority]
   )
 
-  const safeAlt = useMemo(() => autoImageAlt(src, alt), [src, alt])
+  const safeAlt = useMemo(() => autoImageAlt(resolvedSrc, alt), [resolvedSrc, alt])
   const aspectHeight = height ?? Math.round(width * 0.75)
 
-  if (shouldUseNativeImg(src)) {
+  if (shouldUseNativeImg(resolvedSrc)) {
     const srcSet =
-      src.startsWith('data:') || src.startsWith('blob:')
+      resolvedSrc.startsWith('data:') || resolvedSrc.startsWith('blob:')
         ? undefined
-        : imageSrcSet(src, widths, priority ? 78 : 65)
+        : imageSrcSet(resolvedSrc, widths, priority ? 78 : 65)
     return (
       <img
         src={optimized}

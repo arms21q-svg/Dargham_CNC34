@@ -182,7 +182,8 @@ export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData
     let image = p.image
     let images = p.images ?? []
 
-    if (isProxyProductImage(p.image) && db.image && !isProxyProductImage(db.image)) {
+    const localImageMissing = !p.image?.trim() || isProxyProductImage(p.image)
+    if (localImageMissing && db.image?.trim() && !isProxyProductImage(db.image)) {
       image = db.image
     }
 
@@ -205,7 +206,8 @@ export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData
 
   const slideImages = (local.home?.slideImages ?? []).map((url, index) => {
     const storedUrl = stored.home?.slideImages?.[index]
-    if (isProxySlideImage(url) && storedUrl && !isProxySlideImage(storedUrl)) {
+    const localSlideMissing = !url?.trim() || isProxySlideImage(url)
+    if (localSlideMissing && storedUrl?.trim() && !isProxySlideImage(storedUrl)) {
       return storedUrl
     }
     return url

@@ -148,6 +148,12 @@ async function bufferFromSource(src: string): Promise<Buffer | null> {
     if (src.startsWith('data:')) {
       const base64 = src.split(',')[1]
       if (!base64) return null
+      if (base64.length > 400_000) {
+        return sharp(Buffer.from(base64, 'base64'), { sequentialRead: true })
+          .resize(128, 128, { fit: 'inside', fastShrinkOnLoad: true })
+          .jpeg({ quality: 70 })
+          .toBuffer()
+      }
       return Buffer.from(base64, 'base64')
     }
 
@@ -162,7 +168,14 @@ async function bufferFromSource(src: string): Promise<Buffer | null> {
         signal: AbortSignal.timeout(12_000),
       })
       if (!res.ok) return null
-      return Buffer.from(await res.arrayBuffer())
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (buf.length > 800_000) {
+        return sharp(buf, { sequentialRead: true })
+          .resize(128, 128, { fit: 'inside', fastShrinkOnLoad: true })
+          .jpeg({ quality: 70 })
+          .toBuffer()
+      }
+      return buf
     }
 
     return null
@@ -258,9 +271,10 @@ export async function countIndexedPublishedProducts(): Promise<{
   return { published, indexed }
 }
 
-/** Admin/publish only — never call from search. */
+/** Optional pgvector column — HNSW index must be created manually in Supabase (pooler times out). */
 export async function ensurePgvectorSchema(): Promise<boolean> {
-  if (pgvectorReady != null) return pgvectorReady
+  if (pgvectorReady === true) return true
+  if (pgvectorReady === false) return false
   if (pgvectorEnsurePromise) return pgvectorEnsurePromise
 
   pgvectorEnsurePromise = (async () => {
@@ -269,16 +283,13 @@ export async function ensurePgvectorSchema(): Promise<boolean> {
       await prisma.$executeRawUnsafe(
         `ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS embedding vector(${VECTOR_DIM})`
       )
-      await prisma.$executeRawUnsafe(
-        `CREATE INDEX IF NOT EXISTS product_embedding_hnsw ON "Product" USING hnsw (embedding vector_cosine_ops)`
-      )
       pgvectorReady = true
-      console.info('[image-index] pgvector ready (HNSW)')
+      console.info('[image-index] pgvector column ready (search uses imageVector JSON by default)')
       return true
     } catch (err) {
       pgvectorReady = false
       console.warn(
-        '[image-index] pgvector unavailable — using Product.imageVector',
+        '[image-index] pgvector setup skipped — using Product.imageVector JSON',
         err instanceof Error ? err.message : err
       )
       return false
@@ -291,9 +302,9 @@ export async function ensurePgvectorSchema(): Promise<boolean> {
 }
 
 async function persistEmbedding(productId: string, vector: number[]): Promise<void> {
-  const ready = await ensurePgvectorSchema()
-  if (!ready) return
   try {
+    const ready = await ensurePgvectorSchema()
+    if (!ready) return
     const literal = toVectorLiteral(vector)
     await prisma.$executeRawUnsafe(
       `UPDATE "Product" SET embedding = $1::vector WHERE id = $2`,
@@ -513,9 +524,7 @@ export async function ensureProductImageIndex(options?: {
   limit?: number
   /** Stop indexing after this timestamp (ms) to stay within serverless limits. */
   deadline?: number
-}): Promise<{ indexed: number; failed: number }> {
-  await ensurePgvectorSchema()
-
+}): Promise<{ indexed: number; failed: number; failedIds: string[] }> {
   const limit = options?.limit ?? 80
   const products = await prisma.product.findMany({
     select: {
@@ -542,18 +551,28 @@ export async function ensureProductImageIndex(options?: {
 
   let indexed = 0
   let failed = 0
+  const failedIds: string[] = []
 
   async function indexOne(p: (typeof needs)[0]): Promise<'ok' | 'fail'> {
     try {
       const src = pickIndexableImageSource(p)
-      if (!src) return 'fail'
+      if (!src) {
+        console.warn('[image-index] no image source', p.id)
+        return 'fail'
+      }
 
-      const feats =
-        src.startsWith('/api/products/') || (!src.startsWith('data:') && !src.startsWith('http'))
-          ? await featuresFromProductId(p.id)
-          : await featuresFromImageUrl(src)
+      let feats = await featuresFromProductId(p.id)
+      if (!feats && (src.startsWith('http://') || src.startsWith('https://'))) {
+        feats = await featuresFromImageUrl(src)
+      }
+      if (!feats && src.startsWith('data:')) {
+        feats = await featuresFromImageUrl(src)
+      }
 
-      if (!feats) return 'fail'
+      if (!feats) {
+        console.warn('[image-index] feature extract failed', p.id)
+        return 'fail'
+      }
 
       await prisma.product.update({
         where: { id: p.id },
@@ -563,7 +582,7 @@ export async function ensureProductImageIndex(options?: {
           indexedAt: new Date(),
         },
       })
-      await persistEmbedding(p.id, feats.vector)
+      void persistEmbedding(p.id, feats.vector)
       return 'ok'
     } catch (err) {
       console.warn('[image-index] product', p.id, err instanceof Error ? err.message : err)
@@ -571,24 +590,30 @@ export async function ensureProductImageIndex(options?: {
     }
   }
 
-  const BATCH = 3
+  const BATCH = 2
   for (let i = 0; i < needs.length; i += BATCH) {
     if (options?.deadline && Date.now() >= options.deadline) break
 
     const batch = needs.slice(i, i + BATCH)
     const results = await Promise.all(batch.map((p) => indexOne(p)))
-    for (const r of results) {
+    for (const [j, r] of results.entries()) {
       if (r === 'ok') indexed += 1
-      else failed += 1
+      else {
+        failed += 1
+        failedIds.push(batch[j]!.id)
+      }
     }
   }
 
   if (indexed || failed) {
     invalidateVisualIndexCache()
-    console.info('[image-index]', JSON.stringify({ indexed, failed, pending: needs.length }))
+    console.info(
+      '[image-index]',
+      JSON.stringify({ indexed, failed, pending: needs.length, failedIds })
+    )
   }
 
-  return { indexed, failed }
+  return { indexed, failed, failedIds }
 }
 
 /** Fire-and-forget reindex after admin publishes products. */

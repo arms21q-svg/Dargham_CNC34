@@ -1,4 +1,5 @@
 import '../server/loadEnv'
+import { Prisma } from '@prisma/client'
 import { prisma } from '../server/db'
 import { isProxyMediaUrl, isServeableMediaUrl } from '../server/mediaUrls'
 import { slideImages as DEFAULT_SLIDE_IMAGES } from '../src/data/content'
@@ -60,6 +61,17 @@ async function main() {
   )
   for (const p of broken) {
     console.warn(' -', p.id, p.titleAr || '(no title)')
+    await prisma.product.update({
+      where: { id: p.id },
+      data: {
+        image: '',
+        images: [],
+        imageHash: null,
+        imageVector: Prisma.DbNull,
+        indexedAt: null,
+      },
+    })
+    console.info('[fix-media] cleared proxy-only image fields for', p.id)
   }
 }
 

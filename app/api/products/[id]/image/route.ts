@@ -8,14 +8,16 @@ export const maxDuration = 30
 
 type Props = { params: Promise<{ id: string }> }
 
-function pickImage(
-  image: string,
-  images: string[],
-  index: number
-): string {
-  const gallery = images.length > 0 ? images : image ? [image] : []
-  if (index <= 0) return image || gallery[0] || ''
-  return gallery[index] ?? ''
+function pickServeableImage(image: string, images: string[], index: number): string {
+  const candidates =
+    index <= 0
+      ? [image, ...images]
+      : [images[index] ?? '', image, ...images]
+
+  for (const url of candidates) {
+    if (url && !isProxyMediaUrl(url)) return url
+  }
+  return ''
 }
 
 export async function GET(req: NextRequest, { params }: Props) {
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest, { params }: Props) {
       return new NextResponse('Not found', { status: 404 })
     }
 
-    const raw = pickImage(product.image, product.images ?? [], index)
+    const raw = pickServeableImage(product.image, product.images ?? [], index)
     if (!raw || isProxyMediaUrl(raw)) {
       return new NextResponse('Not found', { status: 404 })
     }

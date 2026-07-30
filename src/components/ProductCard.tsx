@@ -1,10 +1,26 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, type ComponentProps } from 'react'
 import Link from 'next/link'
 import type { Product } from '../data/content'
 import { useApp } from '../context/AppContext'
 import OptimizedImage from './OptimizedImage'
+
+type ProductPhotoProps = ComponentProps<typeof OptimizedImage>
+
+function ProductPhoto({ src, className, alt, ...rest }: ProductPhotoProps) {
+  if (!src?.trim()) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-gray-200 text-xs text-gray-400 dark:bg-gray-800 dark:text-gray-500 ${className ?? ''}`}
+        aria-hidden={!alt}
+      >
+        —
+      </div>
+    )
+  }
+  return <OptimizedImage src={src} alt={alt} className={className} {...rest} />
+}
 
 interface ProductCardProps {
   product: Product
@@ -33,7 +49,7 @@ function ProductCard({
           className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414] text-center shadow-sm md:hidden"
         >
           <div className="relative aspect-square w-full overflow-hidden bg-black/40">
-            <OptimizedImage
+            <ProductPhoto
               src={product.image}
               alt={product.title[lang]}
               width={400}
@@ -58,7 +74,7 @@ function ProductCard({
         <div className="card-hover group hidden overflow-hidden content-visibility-auto md:block">
           <Link href={`/works/${product.id}`} prefetch={false} className="block">
             <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
-              <OptimizedImage
+              <ProductPhoto
                 src={product.image}
                 alt={product.title[lang]}
                 width={480}
@@ -133,7 +149,7 @@ function ProductCard({
     <div className="card-hover group overflow-hidden content-visibility-auto">
       <Link href={`/works/${product.id}`} prefetch={false} className="block">
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
-          <OptimizedImage
+          <ProductPhoto
             src={product.image}
             alt={product.title[lang]}
             width={480}

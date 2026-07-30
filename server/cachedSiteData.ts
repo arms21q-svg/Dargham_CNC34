@@ -23,7 +23,7 @@ export async function getCachedSiteData(): Promise<SiteData | null> {
   if (process.env.NEXT_PHASE === 'phase-production-build') return null
 
   try {
-    return await unstable_cache(fetchSiteDataRaw, ['site-data-v1'], {
+    return await unstable_cache(fetchSiteDataRaw, ['site-data-v2'], {
       revalidate: false,
       tags: ['site-data'],
     })()

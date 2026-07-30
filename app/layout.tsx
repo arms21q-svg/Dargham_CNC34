@@ -127,7 +127,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="" />
         <link rel="preconnect" href={absoluteUrl('/')} />
-        <link rel="preload" href="/api/site-data" as="fetch" crossOrigin="anonymous" />
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
         </Script>

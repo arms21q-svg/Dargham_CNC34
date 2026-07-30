@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { DEFAULT_ADMIN_EMAIL } from '../../data/defaultSiteData'
 import { useSiteData } from '../../context/SiteDataContext'
 
 export default function AdminLogin() {
@@ -73,7 +74,7 @@ export default function AdminLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="admin@dorghamcnc.com"
+              placeholder={DEFAULT_ADMIN_EMAIL}
               autoComplete="username"
               required
               autoFocus

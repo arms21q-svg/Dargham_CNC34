@@ -44,8 +44,12 @@ export async function searchProductsByImageEmbeddings(
   const exact = visual[0] && visual[0].hamming <= 6
   const softMatch = !exact && matches[0].score < STRONG_MATCH_THRESHOLD
 
+  const MIN_SOFT_SCORE = 32
+  const ranked = softMatch ? matches.filter((m) => m.score >= MIN_SOFT_SCORE) : matches
+  const finalMatches = ranked.length > 0 ? ranked : matches.slice(0, 5)
+
   return {
-    matches: softMatch ? matches.filter((m) => m.score >= 40) : matches,
+    matches: finalMatches,
     analysis: null,
     softMatch,
     mode: exact ? 'db-exact' : `db-visual:${timings.path}`,

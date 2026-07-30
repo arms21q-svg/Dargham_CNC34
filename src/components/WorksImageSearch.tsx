@@ -123,9 +123,13 @@ export default function WorksImageSearch({ open, onClose, onResult }: WorksImage
 
       if (!apiResult || apiResult.matches.length === 0) {
         setError(
-          lang === 'ar'
-            ? 'لم نجد تطابقاً واضحاً. جرّب صورة أوضح أو زاوية مختلفة.'
-            : 'No clear match found. Try a clearer photo or different angle.'
+          apiResult?.mode === 'db-empty'
+            ? lang === 'ar'
+              ? 'لم تُفهرَس صور الأعمال بعد. من لوحة الأدمن: افتح «أعمال» ثم «نشر على الموقع»، أو تواصل مع الدعم.'
+              : 'Work images are not indexed yet. Republish from admin, or contact support.'
+            : lang === 'ar'
+              ? 'لم نجد تطابقاً واضحاً. جرّب صورة أوضح أو زاوية مختلفة.'
+              : 'No clear match found. Try a clearer photo or different angle.'
         )
         return
       }

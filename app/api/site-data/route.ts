@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { getCachedSiteData, fetchSiteDataFresh } from '@server/cachedSiteData'
 import { lightPublicSiteData } from '@server/lightSiteData'
-import { scheduleProductImageReindex } from '@server/imageIndex'
+import { scheduleProductImageReindex, ensureProductImageIndex } from '@server/imageIndex'
 import { syncSiteDataToDb } from '@server/syncSiteData'
 import { verifyBearerHeader } from '@server/vercelAuth'
 import type { SiteData } from '@/types/siteData'
@@ -140,7 +140,19 @@ export async function PUT(req: NextRequest) {
     }
 
     if (sync.needsReindex.length > 0) {
-      scheduleProductImageReindex(sync.needsReindex)
+      try {
+        const indexResult = await ensureProductImageIndex({
+          forceIds: sync.needsReindex,
+          limit: 120,
+        })
+        console.info('[publish] image index', indexResult)
+      } catch (indexErr) {
+        console.warn('[publish] inline index failed — scheduling retry', indexErr)
+        scheduleProductImageReindex(sync.needsReindex)
+      }
+    } else {
+      // Ensure catalog is indexed even when URLs did not change (first deploy / missed index)
+      void ensureProductImageIndex({ limit: 40 }).catch(() => {})
     }
 
     try {

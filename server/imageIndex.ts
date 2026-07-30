@@ -111,12 +111,49 @@ function scoreFromSignals(cosine: number, hamming: number): number {
   return Math.max(0, Math.min(99, score))
 }
 
+function pickIndexableImageSource(product: {
+  image: string
+  images?: string[]
+}): string {
+  const candidates = [product.image, ...(product.images ?? [])].filter(Boolean)
+  for (const url of candidates) {
+    if (url.startsWith('data:')) return url
+  }
+  for (const url of candidates) {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url
+  }
+  for (const url of candidates) {
+    if (url.startsWith('/api/products/')) return url
+  }
+  return candidates[0] ?? ''
+}
+
+async function bufferFromProductId(productId: string): Promise<Buffer | null> {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { image: true, images: true },
+  })
+  if (!product) return null
+
+  for (const url of [product.image, ...(product.images ?? [])]) {
+    if (!url || url.startsWith('/api/products/')) continue
+    const buf = await bufferFromSource(url)
+    if (buf) return buf
+  }
+  return null
+}
+
 async function bufferFromSource(src: string): Promise<Buffer | null> {
   try {
     if (src.startsWith('data:')) {
       const base64 = src.split(',')[1]
       if (!base64) return null
       return Buffer.from(base64, 'base64')
+    }
+
+    const apiMatch = src.match(/^\/api\/products\/([^/?#]+)\/image/i)
+    if (apiMatch?.[1]) {
+      return bufferFromProductId(apiMatch[1])
     }
 
     if (src.startsWith('http://') || src.startsWith('https://')) {
@@ -199,6 +236,36 @@ export async function featuresFromImageUrl(url: string): Promise<VisualFeatures 
   const buf = await bufferFromSource(url)
   if (!buf) return null
   return featuresFromBuffer(buf)
+}
+
+/** Build visual features from a product row (reads base64 from DB — no HTTP). */
+export async function featuresFromProductId(productId: string): Promise<VisualFeatures | null> {
+  const buf = await bufferFromProductId(productId)
+  if (!buf) return null
+  return featuresFromBuffer(buf)
+}
+
+export async function countIndexedPublishedProducts(): Promise<{
+  published: number
+  indexed: number
+}> {
+  const [published, indexed] = await Promise.all([
+    prisma.product.count({ where: { published: true } }),
+    prisma.product.count({
+      where: { published: true, indexedAt: { not: null }, imageHash: { not: null } },
+    }),
+  ])
+  return { published, indexed }
+}
+
+/** Index missing vectors before search — fixes empty catalog after deploy. */
+export async function ensureCatalogReadyForSearch(): Promise<{ indexed: number; failed: number }> {
+  const { published, indexed } = await countIndexedPublishedProducts()
+  if (published === 0 || indexed >= published) {
+    return { indexed: 0, failed: 0 }
+  }
+  console.info('[image-index] catalog gap — indexing', { published, indexed })
+  return ensureProductImageIndex({ limit: 120 })
 }
 
 /** Admin/publish only — never call from search. */
@@ -366,7 +433,7 @@ function searchInMemory(query: VisualFeatures, entries: CatalogEntry[]): VisualM
     const cosine = cosineSimilarity(query.vector, p.vector)
     const hamming = p.hash ? hammingDistanceHex(query.hash, p.hash) : 64
     const score = scoreFromSignals(cosine, hamming)
-    if (score < 35) continue
+    if (score < 30) continue
     scored.push({ id: p.id, score, cosine, hamming })
   }
   scored.sort((a, b) => b.score - a.score || a.hamming - b.hamming)
@@ -391,6 +458,8 @@ export async function searchByVisualFeatures(
     totalMs: 0,
     path: 'empty',
   }
+
+  await ensureCatalogReadyForSearch()
 
   const featStarted = Date.now()
   const query = await featuresFromBase64(queryBase64, mimeType)
@@ -421,7 +490,7 @@ export async function searchByVisualFeatures(
   if (pg?.length) {
     const rankStarted = Date.now()
     matches = pg
-      .filter((m) => m.score >= 35)
+      .filter((m) => m.score >= 30)
       .sort((a, b) => b.score - a.score || a.hamming - b.hamming)
       .slice(0, SEARCH_TOP_K)
     timings.rankMs = Date.now() - rankStarted
@@ -472,8 +541,9 @@ export async function ensureProductImageIndex(options?: {
 
   const needs = products
     .filter((p) => {
-      if (options?.forceIds?.includes(p.id)) return true
-      if (!p.image) return false
+      if (options?.forceIds?.includes(p.id)) return Boolean(pickIndexableImageSource(p))
+      const src = pickIndexableImageSource(p)
+      if (!src) return false
       if (!p.imageHash || !p.imageVector || !p.indexedAt) return true
       return p.updatedAt.getTime() > p.indexedAt.getTime()
     })
@@ -484,7 +554,17 @@ export async function ensureProductImageIndex(options?: {
 
   for (const p of needs) {
     try {
-      const feats = await featuresFromImageUrl(p.image)
+      const src = pickIndexableImageSource(p)
+      if (!src) {
+        failed += 1
+        continue
+      }
+
+      const feats =
+        src.startsWith('/api/products/') || (!src.startsWith('data:') && !src.startsWith('http'))
+          ? await featuresFromProductId(p.id)
+          : await featuresFromImageUrl(src)
+
       if (!feats) {
         failed += 1
         continue

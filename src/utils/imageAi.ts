@@ -85,7 +85,8 @@ export async function searchProductsByImage(
   const controller = new AbortController()
   const onAbort = () => controller.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
-  const timer = setTimeout(() => controller.abort(), 12_000)
+  // Allow first search after cold start + auto-indexing
+  const timer = setTimeout(() => controller.abort(), 28_000)
 
   let res: Response
   try {
@@ -101,7 +102,14 @@ export async function searchProductsByImage(
   }
 
   if (!res.ok) {
-    return null
+    let message = lang === 'ar' ? 'تعذر البحث في قاعدة البيانات' : 'Database search failed'
+    try {
+      const errJson = (await res.json()) as { error?: string }
+      if (errJson.error) message = errJson.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
   }
 
   const json = (await res.json()) as {

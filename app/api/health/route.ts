@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@server/db'
+import { countIndexedPublishedProducts } from '@server/imageIndex'
 
 export const maxDuration = 30
 export const runtime = 'nodejs'
@@ -8,15 +9,7 @@ export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`
 
-    const [productCount, indexedCount] = await Promise.all([
-      prisma.product.count({ where: { published: true } }),
-      prisma.product.count({
-        where: {
-          published: true,
-          indexedAt: { not: null },
-        },
-      }),
-    ])
+    const catalog = await countIndexedPublishedProducts()
 
     return NextResponse.json(
       {
@@ -25,8 +18,8 @@ export async function GET() {
         runtime: 'next',
         db: true,
         catalog: {
-          published: productCount,
-          indexed: indexedCount,
+          published: catalog.published,
+          indexed: catalog.indexed,
         },
       },
       {

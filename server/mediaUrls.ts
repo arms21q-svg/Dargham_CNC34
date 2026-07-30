@@ -22,8 +22,30 @@ export function toPublicMediaUrl(
   kind: 'product' | 'slide' = 'product'
 ): string {
   if (!url) return ''
+  if (isProxyMediaUrl(url)) return ''
   if (isHeavyDataUrl(url)) {
     return kind === 'slide' ? slideImageUrl(index) : productImageUrl(ownerId, index)
   }
+  return url
+}
+
+/** Public /api/.../image paths — not storable or serveable without real pixels in DB. */
+export function isProxyMediaUrl(url: string | undefined): boolean {
+  if (!url) return false
+  return url.startsWith('/api/products/') || url.startsWith('/api/site/slides/')
+}
+
+export function isServeableMediaUrl(url: string | undefined): boolean {
+  if (!url || isProxyMediaUrl(url)) return false
+  return (
+    url.startsWith('data:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://')
+  )
+}
+
+export function toPublicProductImage(productId: string, url: string, index = 0): string {
+  if (!url || isProxyMediaUrl(url)) return ''
+  if (isHeavyDataUrl(url)) return productImageUrl(productId, index)
   return url
 }

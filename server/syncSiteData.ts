@@ -5,15 +5,11 @@ import {
   managerFromSiteData,
   productFromSiteData,
 } from './mappers'
+import { isProxyMediaUrl } from './mediaUrls'
 import type { SiteData } from '../src/types/siteData'
 
 type ProductRow = ReturnType<typeof productFromSiteData>
 type ManagerRow = ReturnType<typeof managerFromSiteData>
-
-function isProxyMediaUrl(url: string | undefined): boolean {
-  if (!url) return false
-  return url.startsWith('/api/products/') || url.startsWith('/api/site/slides/')
-}
 
 /** Never overwrite stored base64/URL with public proxy paths from a stripped client payload. */
 function preserveStoredMedia(incoming: string, stored: string): string {
@@ -127,11 +123,14 @@ export async function syncSiteDataToDb(
   body: SiteData,
   passwordHash: string
 ): Promise<SyncSiteDataResult> {
-  const configData = configFromSiteData(body, passwordHash)
   const products = body.products.map((p, i) => productFromSiteData(p, i))
   const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
 
-  const [existingProducts, existingManagers] = await Promise.all([
+  const [existingConfig, existingProducts, existingManagers] = await Promise.all([
+    prisma.siteConfig.findUnique({
+      where: { id: 1 },
+      select: { slideImages: true },
+    }),
     prisma.product.findMany({
       select: {
         id: true,
@@ -165,6 +164,14 @@ export async function syncSiteDataToDb(
       },
     }),
   ])
+
+  const configData = configFromSiteData(body, passwordHash)
+  if (existingConfig?.slideImages?.length) {
+    configData.slideImages = preserveStoredGallery(
+      configData.slideImages,
+      existingConfig.slideImages
+    )
+  }
 
   const prevProductById = new Map(existingProducts.map((p) => [p.id, p]))
   const prevManagerById = new Map(existingManagers.map((m) => [m.id, m]))

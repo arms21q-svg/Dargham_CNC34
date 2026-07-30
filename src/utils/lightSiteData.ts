@@ -3,13 +3,20 @@ import { slideImages as DEFAULT_SLIDE_IMAGES } from '../data/content'
 
 const MAX_INLINE_CHARS = 512
 
+function isProxyMediaUrl(url: string | undefined): boolean {
+  if (!url) return false
+  return url.startsWith('/api/products/') || url.startsWith('/api/site/slides/')
+}
+
 function isHeavyDataUrl(url: string | undefined): boolean {
   return Boolean(url?.startsWith('data:') && url.length > MAX_INLINE_CHARS)
 }
 
 function firstHttpUrl(...candidates: (string | undefined)[]): string {
   for (const url of candidates) {
-    if (url && !url.startsWith('data:') && !url.startsWith('blob:')) return url
+    if (url && !url.startsWith('data:') && !url.startsWith('blob:') && !isProxyMediaUrl(url)) {
+      return url
+    }
   }
   return ''
 }
@@ -24,19 +31,27 @@ function slideImageUrl(index: number): string {
   return `/api/site/slides/${index}/image`
 }
 
+function defaultSlideUrl(index: number): string {
+  return DEFAULT_SLIDE_IMAGES[index] ?? DEFAULT_SLIDE_IMAGES[0] ?? ''
+}
+
+function resolveSlideImage(url: string | undefined, index: number): string {
+  if (!url) return defaultSlideUrl(index)
+  if (isProxyMediaUrl(url)) return defaultSlideUrl(index)
+  if (isHeavyDataUrl(url)) return slideImageUrl(index)
+  return url
+}
+
 function resolveProductImage(product: Product, url: string | undefined, index: number): string {
   if (!url) return firstHttpUrl(product.image, ...(product.images ?? []))
+  if (isProxyMediaUrl(url)) return firstHttpUrl(product.image, ...(product.images ?? []))
   if (isHeavyDataUrl(url)) return productImageUrl(product.id, index)
   return url
 }
 
 /** Drop embedded base64 from public payloads — serve via /api/.../image instead. */
 export function lightPublicSiteData(data: SiteData): SiteData {
-  const slides = (data.home?.slideImages ?? []).map((url, index) => {
-    if (!url) return ''
-    if (isHeavyDataUrl(url)) return slideImageUrl(index)
-    return url
-  }).filter(Boolean)
+  const slides = (data.home?.slideImages ?? []).map((url, index) => resolveSlideImage(url, index)).filter(Boolean)
 
   const products: Product[] = (data.products ?? []).map((p) => {
     const gallery = (p.images ?? []).filter(Boolean)
@@ -46,7 +61,7 @@ export function lightPublicSiteData(data: SiteData): SiteData {
 
     return {
       ...p,
-      image: primary || productImageUrl(p.id, 0),
+      image: primary,
       images: images.filter(Boolean),
     }
   })

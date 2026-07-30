@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { parseDataUrl } from '@server/parseDataUrl'
+import { isProxyMediaUrl } from '@server/mediaUrls'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -32,7 +33,9 @@ export async function GET(req: NextRequest, { params }: Props) {
     }
 
     const raw = pickImage(product.image, product.images ?? [], index)
-    if (!raw) return new NextResponse('Not found', { status: 404 })
+    if (!raw || isProxyMediaUrl(raw)) {
+      return new NextResponse('Not found', { status: 404 })
+    }
 
     if (raw.startsWith('data:')) {
       const parsed = parseDataUrl(raw)

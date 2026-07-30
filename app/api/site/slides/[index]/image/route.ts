@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { parseDataUrl } from '@server/parseDataUrl'
+import { isProxyMediaUrl } from '@server/mediaUrls'
+import { slideImages as DEFAULT_SLIDE_IMAGES } from '@/data/content'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
 type Props = { params: Promise<{ index: string }> }
+
+function fallbackSlideUrl(index: number): string | null {
+  const url = DEFAULT_SLIDE_IMAGES[index] ?? DEFAULT_SLIDE_IMAGES[0]
+  return url?.startsWith('http') ? url : null
+}
 
 export async function GET(_req: NextRequest, { params }: Props) {
   try {
@@ -20,8 +27,12 @@ export async function GET(_req: NextRequest, { params }: Props) {
       select: { slideImages: true },
     })
 
-    const raw = config?.slideImages?.[index]
-    if (!raw) return new NextResponse('Not found', { status: 404 })
+    let raw = config?.slideImages?.[index]
+    if (!raw || isProxyMediaUrl(raw)) {
+      const fallback = fallbackSlideUrl(index)
+      if (fallback) return NextResponse.redirect(fallback, 302)
+      return new NextResponse('Not found', { status: 404 })
+    }
 
     if (raw.startsWith('data:')) {
       const parsed = parseDataUrl(raw)
@@ -37,6 +48,9 @@ export async function GET(_req: NextRequest, { params }: Props) {
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
       return NextResponse.redirect(raw, 302)
     }
+
+    const fallback = fallbackSlideUrl(index)
+    if (fallback) return NextResponse.redirect(fallback, 302)
 
     return new NextResponse('Not found', { status: 404 })
   } catch (error) {

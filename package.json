@@ -19,6 +19,7 @@
     "db:seed": "tsx server/seed.ts",
     "admin:reset": "tsx scripts/resetAdminPassword.ts",
     "db:reindex": "tsx scripts/reindexImages.ts",
+    "db:fix-media": "tsx scripts/fixProxyMedia.ts",
     "db:setup": "prisma db push",
     "postdb:setup": "tsx server/seed.ts",
     "icons:generate": "node scripts/generate-icons.mjs"

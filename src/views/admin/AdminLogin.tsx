@@ -1,18 +1,24 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { DEFAULT_ADMIN_EMAIL } from '../../data/defaultSiteData'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
+import { getAuthToken } from '../../utils/siteDataStorage'
 
-export default function AdminLogin() {
-  const { isAdmin, authReady, login } = useSiteData()
-  const router = useRouter()
+export default function AdminLogin({
+  superEmail,
+  employeeUsernames = [],
+}: {
+  superEmail: string
+  employeeUsernames?: string[]
+}) {
+  const { authReady, login } = useSiteData()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const loginSucceededRef = useRef(false)
 
   const nextPath = (() => {
     const next = searchParams.get('next')
@@ -21,11 +27,11 @@ export default function AdminLogin() {
   })()
 
   useEffect(() => {
-    if (!authReady || !isAdmin) return
-    router.replace(nextPath)
-  }, [authReady, isAdmin, nextPath, router])
+    if (!authReady || !getAuthToken()) return
+    window.location.replace(nextPath)
+  }, [authReady, nextPath])
 
-  if (!authReady || isAdmin) {
+  if (!authReady || getAuthToken()) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-stone-100 to-stone-200 p-4 dark:from-gray-950 dark:to-gray-900">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -35,19 +41,29 @@ export default function AdminLogin() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (submitting || loginSucceededRef.current) return
+
     setSubmitting(true)
     setError('')
 
     try {
       const result = await login(email.trim().toLowerCase(), password)
       if (result.ok) {
+        loginSucceededRef.current = true
+        window.location.assign(nextPath)
         return
       }
-      setError(result.error ?? 'البريد أو كلمة المرور غير صحيحة')
+      if (!loginSucceededRef.current) {
+        setError(result.error ?? 'البريد أو كلمة المرور غير صحيحة')
+      }
     } catch {
-      setError('تعذر تسجيل الدخول — تحقق من الاتصال وحاول مجدداً')
+      if (!loginSucceededRef.current) {
+        setError('تعذر تسجيل الدخول — تحقق من الاتصال وحاول مجدداً')
+      }
     } finally {
-      setSubmitting(false)
+      if (!loginSucceededRef.current) {
+        setSubmitting(false)
+      }
     }
   }
 
@@ -68,6 +84,21 @@ export default function AdminLogin() {
           </p>
         </div>
 
+        <div className="mb-4 rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-900 dark:bg-primary-950/40 dark:text-primary-100">
+          <p>
+            <span className="font-semibold">بريد المدير الرئيسي:</span> {superEmail}
+          </p>
+          {employeeUsernames.length > 0 && (
+            <p className="mt-1">
+              <span className="font-semibold">حسابات الموظفين (اسم مستخدم):</span>{' '}
+              {employeeUsernames.join(' · ')}
+            </p>
+          )}
+          <p className="mt-2 text-xs opacity-80">
+            إذا غيّرت كلمة المرور مؤخراً، استخدم الكلمة الجديدة وليس القديمة.
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="form-label">البريد أو اسم المستخدم</label>
@@ -77,7 +108,7 @@ export default function AdminLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder={DEFAULT_ADMIN_EMAIL}
+              placeholder={superEmail}
               autoComplete="username"
               required
               autoFocus

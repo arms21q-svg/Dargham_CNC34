@@ -109,9 +109,16 @@ export function SiteDataProvider({
       setLoading(false)
     }
 
-    // Auth only — public pages hydrate from SSR bootstrap + background API sync
+    // JWT in sessionStorage is the source of truth for admin UI on production.
+    const token = getAuthToken()
     const flagged = sessionStorage.getItem(ADMIN_AUTH_KEY) === 'true'
-    if (flagged && isVercelHost() && !getAuthToken()) {
+
+    if (token) {
+      sessionStorage.setItem(ADMIN_AUTH_KEY, 'true')
+      setAdminSessionCookie(true)
+      setIsAdmin(true)
+      setAdminRoleState(getAdminRole())
+    } else if (flagged && isVercelHost()) {
       sessionStorage.removeItem(ADMIN_AUTH_KEY)
       setAdminSessionCookie(false)
       setIsAdmin(false)

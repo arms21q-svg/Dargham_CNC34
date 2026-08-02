@@ -98,15 +98,20 @@ export function setAdminSessionCookie(active: boolean) {
   }
 }
 
-export function setAuthToken(token: string | null) {
-  if (typeof window === 'undefined') return
-  if (token) {
-    sessionStorage.setItem(AUTH_TOKEN_KEY, token)
-    setAdminSessionCookie(true)
-  } else {
-    sessionStorage.removeItem(AUTH_TOKEN_KEY)
-    sessionStorage.removeItem(ADMIN_ROLE_KEY)
-    setAdminSessionCookie(false)
+export function setAuthToken(token: string | null): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    if (token) {
+      sessionStorage.setItem(AUTH_TOKEN_KEY, token)
+      setAdminSessionCookie(true)
+    } else {
+      sessionStorage.removeItem(AUTH_TOKEN_KEY)
+      sessionStorage.removeItem(ADMIN_ROLE_KEY)
+      setAdminSessionCookie(false)
+    }
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -409,7 +414,13 @@ export async function loginWithApi(
     }
 
     if (res.ok && json.ok && json.token) {
-      setAuthToken(json.token)
+      if (!setAuthToken(json.token)) {
+        return {
+          ok: false,
+          error:
+            'تعذر حفظ جلسة الدخول في المتصفح. جرّب نافذة عادية (ليس وضع التصفّح الخاص) أو متصفحاً آخر.',
+        }
+      }
       const role = json.user?.role ?? 'admin'
       setAdminRole(role)
       return { ok: true, role }

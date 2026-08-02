@@ -21,6 +21,10 @@ function cleanPassword(raw: unknown): string {
     .trim()
 }
 
+function isValidBcryptHash(hash: string | null | undefined): hash is string {
+  return Boolean(hash && hash.startsWith('$2'))
+}
+
 export async function POST(req: NextRequest) {
   try {
     const limited = rateLimit(`login:${clientIp(req)}`, 20, 60_000)
@@ -113,7 +117,7 @@ export async function POST(req: NextRequest) {
       where: {
         OR: [
           { email: { equals: loginId, mode: 'insensitive' } },
-          { username: loginId },
+          { username: { equals: loginId, mode: 'insensitive' } },
         ],
       },
     })
@@ -126,7 +130,10 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      if (await bcrypt.compare(password, adminUser.passwordHash)) {
+      if (
+        isValidBcryptHash(adminUser.passwordHash) &&
+        (await bcrypt.compare(password, adminUser.passwordHash))
+      ) {
         return issueToken({
           email: adminUser.email,
           role: adminUser.role,
@@ -142,7 +149,7 @@ export async function POST(req: NextRequest) {
       const configEmail = cleanLoginId(config.adminEmail)
       if (
         loginId === configEmail &&
-        config.adminPasswordHash &&
+        isValidBcryptHash(config.adminPasswordHash) &&
         (await bcrypt.compare(password, config.adminPasswordHash))
       ) {
         try {

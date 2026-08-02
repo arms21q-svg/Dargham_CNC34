@@ -18,6 +18,7 @@ function cleanPassword(raw: unknown): string {
   return String(raw ?? '')
     .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
     .normalize('NFC')
+    .trim()
 }
 
 export async function POST(req: NextRequest) {
@@ -105,35 +106,15 @@ export async function POST(req: NextRequest) {
       return res
     }
 
-    // 1) Prefer SiteConfig super credentials (source of truth after password resets)
     const config = await prisma.siteConfig.findUnique({ where: { id: 1 } })
-    if (config) {
-      const configEmail = cleanLoginId(config.adminEmail)
-      if (loginId === configEmail) {
-        const ok = await bcrypt.compare(password, config.adminPasswordHash)
-        if (ok) {
-          try {
-            await ensureSuperAdminSeeded(configEmail, config.adminPasswordHash)
-          } catch (syncErr) {
-            console.warn('admin user sync on login skipped', syncErr)
-          }
-          return issueToken({
-            email: config.adminEmail,
-            role: 'super',
-            userId: 'legacy-super',
-          })
-        }
-        return NextResponse.json(
-          { ok: false, error: 'البريد أو كلمة المرور غير صحيحة' },
-          { status: 401 }
-        )
-      }
-    }
 
-    // 2) Other admin users (employees)
+    // 1) AdminUser table (employees + synced super admin)
     const adminUser = await prisma.adminUser.findFirst({
       where: {
-        OR: [{ email: loginId }, { username: loginId }],
+        OR: [
+          { email: { equals: loginId, mode: 'insensitive' } },
+          { username: loginId },
+        ],
       },
     })
 
@@ -145,14 +126,34 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const validPassword = await bcrypt.compare(password, adminUser.passwordHash)
-      if (validPassword) {
+      if (await bcrypt.compare(password, adminUser.passwordHash)) {
         return issueToken({
           email: adminUser.email,
           role: adminUser.role,
           userId: adminUser.id,
           nameAr: adminUser.nameAr,
           nameEn: adminUser.nameEn,
+        })
+      }
+    }
+
+    // 2) SiteConfig super credentials (fallback when AdminUser hash is out of sync)
+    if (config) {
+      const configEmail = cleanLoginId(config.adminEmail)
+      if (
+        loginId === configEmail &&
+        config.adminPasswordHash &&
+        (await bcrypt.compare(password, config.adminPasswordHash))
+      ) {
+        try {
+          await ensureSuperAdminSeeded(configEmail, config.adminPasswordHash)
+        } catch (syncErr) {
+          console.warn('admin user sync on login skipped', syncErr)
+        }
+        return issueToken({
+          email: config.adminEmail,
+          role: 'super',
+          userId: 'legacy-super',
         })
       }
     }

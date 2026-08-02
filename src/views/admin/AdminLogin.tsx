@@ -38,14 +38,17 @@ export default function AdminLogin() {
     setSubmitting(true)
     setError('')
 
-    const result = await login(email.trim(), password.trim())
-    setSubmitting(false)
-
-    if (result.ok) {
-      return
+    try {
+      const result = await login(email.trim().toLowerCase(), password)
+      if (result.ok) {
+        return
+      }
+      setError(result.error ?? 'البريد أو كلمة المرور غير صحيحة')
+    } catch {
+      setError('تعذر تسجيل الدخول — تحقق من الاتصال وحاول مجدداً')
+    } finally {
+      setSubmitting(false)
     }
-
-    setError(result.error ?? 'البريد أو كلمة المرور غير صحيحة')
   }
 
   return (

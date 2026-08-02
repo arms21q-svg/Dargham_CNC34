@@ -186,9 +186,14 @@ export function SiteDataProvider({
       setAdminSessionCookie(true)
       setIsAdmin(true)
       setAdminRoleState(apiResult.role ?? getAdminRole())
-      const fresh = await loadSiteData()
-      setSiteData(fresh)
-      saveSiteDataLocal(fresh)
+      void loadSiteData()
+        .then((fresh) => {
+          setSiteData(fresh)
+          saveSiteDataLocal(fresh)
+        })
+        .catch(() => {
+          /* token session is valid; site data reload can finish in background */
+        })
       return { ok: true }
     }
 

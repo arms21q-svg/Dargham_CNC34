@@ -16,6 +16,7 @@ export const ADMIN_ROLE_KEY = 'dorgham-cnc-admin-role'
 const STATIC_SAVE_ENDPOINT = apiUrl('/api/save-data.php')
 /** Publish can take longer with many products; keep under Vercel maxDuration. */
 const FETCH_TIMEOUT_MS = 55_000
+const LOGIN_TIMEOUT_MS = 20_000
 const MAX_PUBLISH_CHARS = 3_200_000
 
 export function countEmbeddedImages(data: SiteData): number {
@@ -374,12 +375,23 @@ export async function loginWithApi(
   password: string
 ): Promise<{ ok: boolean; error?: string; useFallback?: boolean; role?: string }> {
   try {
-    const res = await fetchWithTimeout(apiUrl('/api/auth/login'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ email, password }),
-    })
+    const loginId = email.trim().toLowerCase()
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS)
+    let res: Response | null = null
+    try {
+      res = await fetch(apiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: loginId, username: loginId, password }),
+        signal: controller.signal,
+      })
+    } catch {
+      res = null
+    } finally {
+      clearTimeout(timer)
+    }
     if (!res) {
       return { ok: false, useFallback: true, error: 'تعذر الاتصال بالسيرفر' }
     }

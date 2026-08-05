@@ -22,6 +22,17 @@ function sanitizePublicSiteData(data: SiteData): SiteData {
   }
 }
 
+/** Admin API may read login email; password is never exposed to the client. */
+function sanitizeAdminSiteData(data: SiteData): SiteData {
+  return {
+    ...data,
+    settings: {
+      ...data.settings,
+      adminPassword: '',
+    },
+  }
+}
+
 async function fetchSiteData(fresh = false) {
   return fresh ? fetchSiteDataFresh() : getCachedSiteData()
 }
@@ -82,8 +93,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const sanitized = sanitizePublicSiteData(data)
-    const payload = isAdmin ? sanitized : lightPublicSiteData(sanitized)
+    const payload = isAdmin ? sanitizeAdminSiteData(data) : lightPublicSiteData(sanitizePublicSiteData(data))
 
     return NextResponse.json(
       { ok: true, data: payload },
@@ -114,30 +124,15 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'قاعدة البيانات غير مهيأة' }, { status: 404 })
     }
 
-    const isSuper = auth.role === 'super'
-
-    let adminEmail = existing.adminEmail
+    // Login credentials change only via /api/auth/update-credentials — never from publish.
+    const adminEmail = existing.adminEmail
     const passwordHash = existing.adminPasswordHash
-
-    if (isSuper) {
-      const requestedEmail = body.settings.adminEmail?.trim().toLowerCase()
-      if (requestedEmail) adminEmail = requestedEmail
-    }
 
     body.settings.adminEmail = adminEmail
     body.settings.adminPassword = ''
     body.updatedAt = Date.now()
 
     const sync = await syncSiteDataToDb(body, passwordHash)
-
-    if (isSuper) {
-      try {
-        const { syncSuperAdminFromConfig } = await import('@server/utils/adminUsers')
-        await syncSuperAdminFromConfig(adminEmail)
-      } catch (syncErr) {
-        console.error('super admin sync skipped', syncErr)
-      }
-    }
 
     if (sync.needsReindex.length > 0) {
       try {

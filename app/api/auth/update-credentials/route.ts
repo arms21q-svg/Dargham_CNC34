@@ -71,6 +71,13 @@ export async function POST(req: NextRequest) {
 
     await syncSuperAdminFromConfig(email, password || undefined)
 
+    try {
+      const { revalidatePublishedSite } = await import('@server/revalidateSite')
+      await revalidatePublishedSite()
+    } catch (cacheErr) {
+      console.warn('site cache revalidate skipped', cacheErr)
+    }
+
     return NextResponse.json({
       ok: true,
       message: password

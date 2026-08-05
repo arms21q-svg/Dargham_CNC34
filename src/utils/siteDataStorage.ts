@@ -140,6 +140,19 @@ export function getAdminRole(): string | null {
   return null
 }
 
+export function getAdminEmailFromToken(): string | null {
+  if (typeof window === 'undefined') return null
+  const token = getAuthToken()
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1] ?? '')) as { email?: string }
+    const email = payload.email?.trim().toLowerCase()
+    return email || null
+  } catch {
+    return null
+  }
+}
+
 export function isSuperAdminSession(): boolean {
   return getAdminRole() === 'super'
 }
@@ -227,19 +240,20 @@ export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData
 }
 
 function preserveAdminCredentials(result: SiteData, candidates: SiteData[]): SiteData {
-  const emailSource = candidates.find((c) => c.settings.adminEmail?.trim())
-  // Never re-inject a default/plaintext password from defaults — empty means "unchanged on server".
   const emailFromResult = result.settings.adminEmail?.trim()
+  const emailFromToken = getAdminEmailFromToken()
+  const emailSource = candidates.find((c) => c.settings.adminEmail?.trim())
   const adminEmail =
     emailFromResult ||
+    emailFromToken ||
     emailSource?.settings.adminEmail?.trim() ||
-    DEFAULT_ADMIN_EMAIL
+    (getAuthToken() ? '' : DEFAULT_ADMIN_EMAIL)
 
   return {
     ...result,
     settings: {
       ...result.settings,
-      adminEmail,
+      adminEmail: adminEmail || DEFAULT_ADMIN_EMAIL,
       // Keep empty unless this client session explicitly set a draft password
       adminPassword: result.settings.adminPassword?.trim() || '',
     },

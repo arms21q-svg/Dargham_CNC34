@@ -60,6 +60,11 @@ export default function AdminAccount() {
       return
     }
 
+    if (password && !password2) {
+      setError('أكّد كلمة المرور الجديدة')
+      return
+    }
+
     const token = getAuthToken()
     if (!token) {
       setError('انتهت الجلسة — سجّل الدخول مجدداً')
@@ -114,7 +119,7 @@ export default function AdminAccount() {
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">حساب المدير</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          يُحفظ البريد وكلمة المرور مباشرة على السيرفر، ثم يُطلب منك تسجيل الدخول من جديد
+          غيّر بيانات الدخول هنا فقط — النشر على الموقع لا يغيّر كلمة المرور
         </p>
       </div>
 

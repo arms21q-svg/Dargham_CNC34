@@ -1,10 +1,8 @@
 import { Router } from 'express'
-import bcrypt from 'bcryptjs'
 import { prisma } from '../db'
 import { toSiteData } from '../mappers'
 import type { SiteData } from '../../src/types/siteData'
 import { requireAuth, type AuthRequest } from '../middleware/auth'
-import { syncSuperAdminFromConfig } from '../utils/adminUsers'
 import { scheduleProductImageReindex } from '../imageIndex'
 import { syncSiteDataToDb } from '../syncSiteData'
 
@@ -68,29 +66,15 @@ router.put('/', requireAuth, async (req: AuthRequest, res) => {
       return
     }
 
-    const isSuper = req.adminRole === 'super'
-    let adminEmail = existing.adminEmail
-    let passwordHash = existing.adminPasswordHash
-    let nextPassword: string | undefined
-
-    if (isSuper) {
-      const requestedEmail = body.settings.adminEmail?.trim().toLowerCase()
-      if (requestedEmail) adminEmail = requestedEmail
-      nextPassword = body.settings.adminPassword?.trim() || undefined
-      if (nextPassword) {
-        passwordHash = await bcrypt.hash(nextPassword, 10)
-      }
-    }
+    // Login credentials change only via update-credentials — never from publish.
+    const adminEmail = existing.adminEmail
+    const passwordHash = existing.adminPasswordHash
 
     body.settings.adminEmail = adminEmail
     body.settings.adminPassword = ''
     body.updatedAt = Date.now()
 
     const sync = await syncSiteDataToDb(body, passwordHash)
-
-    if (isSuper) {
-      await syncSuperAdminFromConfig(adminEmail, nextPassword)
-    }
 
     if (sync.needsReindex.length > 0) {
       scheduleProductImageReindex(sync.needsReindex)

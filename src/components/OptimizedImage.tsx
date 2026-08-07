@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useMemo, type ImgHTMLAttributes } from 'react'
 import { autoImageAlt } from '../lib/seo'
 import { apiUrl } from '../utils/apiBase'
-import { imageSrcSet, optimizeImageUrl } from '../utils/images'
+import { imageSrcSet, isRemoteHttpUrl, optimizeImageUrl } from '../utils/images'
 
 interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'srcSet' | 'src'> {
   src: string
@@ -22,7 +22,13 @@ function resolveImageSrc(src: string): string {
 }
 
 function shouldUseNativeImg(src: string) {
-  return !src || src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('/') || src.includes('/api/products/')
+  if (!src) return true
+  if (src.startsWith('data:') || src.startsWith('blob:')) return true
+  if (src.startsWith('/')) return true
+  if (src.includes('/api/products/') || src.includes('/api/site/slides/')) return true
+  // User-provided image URLs can be any host — next/image remotePatterns block most of them.
+  if (isRemoteHttpUrl(src)) return true
+  return false
 }
 
 /**
@@ -64,6 +70,7 @@ export default function OptimizedImage({
         loading={priority ? 'eager' : 'lazy'}
         decoding={priority ? 'async' : 'async'}
         fetchPriority={priority ? 'high' : 'auto'}
+        referrerPolicy={isRemoteHttpUrl(resolvedSrc) ? 'no-referrer' : undefined}
         width={width}
         height={aspectHeight}
         {...rest}

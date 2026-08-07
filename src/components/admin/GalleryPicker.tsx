@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { fileToDataUrl } from '../../utils/imageFile'
+import { normalizeImageUrlInput } from '../../utils/images'
 
 interface GalleryPickerProps {
   images: string[]
@@ -48,7 +49,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
   }
 
   const addUrl = () => {
-    const url = urlDraft.trim()
+    const url = normalizeImageUrlInput(urlDraft)
     if (!url) return
     if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) {
       setError('استخدم رابطاً يبدأ بـ https://')

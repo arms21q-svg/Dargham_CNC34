@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { fileToDataUrl } from '../../utils/imageFile'
+import { normalizeImageUrlInput } from '../../utils/images'
 
 type ImageMode = 'url' | 'file'
 
@@ -71,10 +72,13 @@ export default function ImagePicker({ value, onChange, label = 'الصورة' }:
           value={value.startsWith('data:') ? '' : value}
           onChange={(e) => {
             setError('')
-            onChange(e.target.value)
+            onChange(normalizeImageUrlInput(e.target.value))
           }}
           placeholder="https://example.com/image.jpg"
         />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          استخدم رابطاً مباشراً للصورة (ينتهي بـ .jpg أو .png) — ثم انقر «نشر» لحفظ التغييرات
+        </p>
       ) : (
         <div>
           <input

@@ -6,6 +6,25 @@ export interface ImageOpts {
   quality?: number
 }
 
+/** Normalize admin-pasted image links (https prefix, trim). */
+export function normalizeImageUrlInput(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  if (
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('/')
+  ) {
+    return trimmed
+  }
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed.replace(/^\/+/, '')}`
+}
+
+export function isRemoteHttpUrl(url: string | undefined): boolean {
+  return Boolean(url && /^https?:\/\//i.test(url))
+}
+
 function optimizeSupabaseUrl(url: URL, opts: ImageOpts): string | null {
   // object/public/... → render/image/public/...?width=&quality=
   const marker = '/storage/v1/object/public/'

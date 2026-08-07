@@ -13,7 +13,7 @@ function isUsableCardImage(url: string | undefined): url is string {
   return Boolean(url?.trim())
 }
 
-/** Resolve card/thumbnail src — never leave catalog tiles without an image URL to try. */
+/** Resolve card/thumbnail src; empty when the product has no stored image. */
 export function productCardImageSrc(product: {
   id: string
   image?: string
@@ -22,5 +22,5 @@ export function productCardImageSrc(product: {
   if (isUsableCardImage(product.image)) return product.image.trim()
   const fromGallery = product.images?.find((url) => isUsableCardImage(url))?.trim()
   if (fromGallery) return fromGallery
-  return productImageProxyUrl(product.id)
+  return ''
 }

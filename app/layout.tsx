@@ -125,7 +125,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
-        <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="" />
+        <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="preconnect" href={absoluteUrl('/')} />
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
@@ -138,8 +138,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-screen antialiased">
         <Providers initialSiteData={bootstrap}>{children}</Providers>
-        <Analytics />
-        <SpeedInsights />
+        {process.env.NODE_ENV === 'production' ? (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        ) : null}
       </body>
     </html>
   )

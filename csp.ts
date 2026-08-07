@@ -1,13 +1,16 @@
 const isDev = process.env.NODE_ENV === 'development'
 
+const vercelDevScriptSrc = isDev ? ' https://va.vercel-scripts.com' : ''
+const vercelDevConnectSrc = isDev ? ' https://vitals.vercel-insights.com' : ''
+
 /** CSP tuned for Next.js: strict in production, dev-friendly for React/Turbopack HMR. */
 export function buildContentSecurityPolicy(): string {
   const scriptSrc = isDev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'${vercelDevScriptSrc}`
     : "script-src 'self' 'unsafe-inline'"
 
   const connectSrc = isDev
-    ? "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co wss://*.supabase.co ws: wss: http://localhost:* https://localhost:*"
+    ? `connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co wss://*.supabase.co ws: wss: http://localhost:* https://localhost:*${vercelDevConnectSrc}`
     : "connect-src 'self' https://generativelanguage.googleapis.com https://*.supabase.co wss://*.supabase.co"
 
   return [

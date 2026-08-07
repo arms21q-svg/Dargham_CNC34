@@ -67,18 +67,20 @@ export default function ImagePicker({ value, onChange, label = 'الصورة' }:
       </div>
 
       {mode === 'url' ? (
-        <input
-          className="input-field"
-          value={value.startsWith('data:') ? '' : value}
-          onChange={(e) => {
-            setError('')
-            onChange(normalizeImageUrlInput(e.target.value))
-          }}
-          placeholder="https://example.com/image.jpg"
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          استخدم رابطاً مباشراً للصورة (ينتهي بـ .jpg أو .png) — ثم انقر «نشر» لحفظ التغييرات
-        </p>
+        <div>
+          <input
+            className="input-field"
+            value={value.startsWith('data:') ? '' : value}
+            onChange={(e) => {
+              setError('')
+              onChange(normalizeImageUrlInput(e.target.value))
+            }}
+            placeholder="https://example.com/image.jpg"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            استخدم رابطاً مباشراً للصورة (ينتهي بـ .jpg أو .png) — ثم انقر «نشر» لحفظ التغييرات
+          </p>
+        </div>
       ) : (
         <div>
           <input

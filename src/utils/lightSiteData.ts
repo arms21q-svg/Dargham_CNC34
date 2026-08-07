@@ -56,8 +56,10 @@ export function lightPublicSiteData(data: SiteData): SiteData {
   const products: Product[] = (data.products ?? []).map((p) => {
     const gallery = (p.images ?? []).filter(Boolean)
     const primarySource = p.image || gallery[0] || ''
-    const primary = resolveProductImage(p, primarySource, 0) || productImageUrl(p.id, 0)
-    const images = gallery.map((url, index) => resolveProductImage(p, url, index) || productImageUrl(p.id, index))
+    const primary = resolveProductImage(p, primarySource, 0)
+    const images = gallery
+      .map((url, index) => resolveProductImage(p, url, index))
+      .filter(Boolean)
 
     return {
       ...p,

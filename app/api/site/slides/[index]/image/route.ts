@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: Props) {
       select: { slideImages: true },
     })
 
-    let raw = config?.slideImages?.[index]
+    const raw = config?.slideImages?.[index]
     if (!raw || isProxyMediaUrl(raw)) {
       const fallback = fallbackSlideUrl(index)
       if (fallback) return NextResponse.redirect(fallback, 302)

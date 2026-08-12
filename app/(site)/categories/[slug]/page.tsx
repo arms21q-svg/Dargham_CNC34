@@ -1,6 +1,6 @@
 import CategoryPage from '@/views/CategoryPage'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 120
 
 export default function Page() {
   return <CategoryPage />

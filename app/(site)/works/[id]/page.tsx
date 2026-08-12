@@ -13,8 +13,7 @@ import { getProductById } from '@server/productDetail'
 type Props = { params: Promise<{ id: string }> }
 
 /** Fresh HTML on each request; invalidated on admin publish. */
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const revalidate = 120
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params

@@ -10,7 +10,9 @@ export async function revalidatePublishedSite() {
 
     revalidatePath('/', 'layout')
     revalidatePath('/works')
-    revalidatePath('/works/[slug]', 'page')
+    revalidatePath('/works/[id]', 'page')
+    revalidatePath('/categories')
+    revalidatePath('/categories/[slug]', 'page')
     revalidatePath('/contact')
     revalidatePath('/sitemap.xml')
   } catch (err) {

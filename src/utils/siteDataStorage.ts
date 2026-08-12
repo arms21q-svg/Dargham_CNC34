@@ -275,9 +275,9 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 
 async function loadFromApi(defaults: SiteData, fresh = false): Promise<SiteData | null> {
   const token = getAuthToken()
-  const qs = fresh ? `?fresh=1&v=${Date.now()}` : `?v=${Date.now()}`
+  const qs = fresh ? '?fresh=1' : ''
   const res = await fetchWithTimeout(apiUrl(`/api/site-data${qs}`), {
-    cache: 'no-store',
+    cache: token || fresh ? 'no-store' : 'default',
     headers: {
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

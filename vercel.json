@@ -28,11 +28,20 @@
       ]
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/admin/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/((?!api/|admin).*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=120, stale-while-revalidate=600"
         }
       ]
     }

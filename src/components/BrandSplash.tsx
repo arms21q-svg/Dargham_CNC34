@@ -2,14 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-/** Welcome overlay — once per tab session; fast dismiss for better LCP. */
-const DISPLAY_MS = 1200
+/** Welcome overlay — deferred until after first paint for better LCP. */
+const DISPLAY_MS = 900
 const FADE_MS = 400
 
-/**
- * Brand welcome splash — shows for 3 seconds every time the site is opened.
- * Stays mounted across client navigations so it does not reappear mid-browse.
- */
 export default function BrandSplash({ skip = false }: { skip?: boolean }) {
   const [phase, setPhase] = useState<'hidden' | 'show' | 'leave'>('hidden')
   const [canSkip, setCanSkip] = useState(false)
@@ -22,14 +18,30 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
     if (skip) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     if (sessionStorage.getItem('dorgham-splash-seen') === '1') return
-    sessionStorage.setItem('dorgham-splash-seen', '1')
-    setPhase('show')
+
+    const show = () => {
+      sessionStorage.setItem('dorgham-splash-seen', '1')
+      setPhase('show')
+    }
+
+    const deferShow = () => {
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(show, { timeout: 4000 })
+      } else {
+        window.setTimeout(show, 1500)
+      }
+    }
+
+    if (document.readyState === 'complete') {
+      deferShow()
+    } else {
+      window.addEventListener('load', deferShow, { once: true })
+    }
   }, [skip])
 
   useEffect(() => {
     if (phase !== 'show') return
 
-    // Allow early dismiss after a short beat so the screen never feels stuck
     const skipTimer = window.setTimeout(() => setCanSkip(true), 300)
     const leaveTimer = window.setTimeout(() => setPhase('leave'), DISPLAY_MS)
 
@@ -88,7 +100,7 @@ export default function BrandSplash({ skip = false }: { skip?: boolean }) {
               width={512}
               height={512}
               decoding="async"
-              fetchPriority="auto"
+              fetchPriority="low"
               className="brand-splash__logo"
               draggable={false}
             />

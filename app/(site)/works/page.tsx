@@ -4,8 +4,7 @@ import AllWorksPage from '@/views/AllWorksPage'
 import JsonLd from '@/components/seo/JsonLd'
 import { breadcrumbSchema, buildPageMetadata, DEFAULT_OG_IMAGE } from '@/lib/seo'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const revalidate = 120
 
 export const metadata: Metadata = buildPageMetadata({
   path: '/works',

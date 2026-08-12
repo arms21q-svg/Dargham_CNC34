@@ -26,12 +26,22 @@ export default function AllWorksPage() {
   const [category, setCategory] = useState<string>('all')
   const [imageSearch, setImageSearch] = useState<WorksImageSearchResult | null>(null)
 
-  // Warm DB + pre-index images before first visual search (runs in parallel, non-blocking)
+  // Warm DB + pre-index images before first visual search — deferred until idle
   useEffect(() => {
-    void fetch(apiUrl('/api/health'), { cache: 'no-store' }).catch(() => {})
-    void fetch(apiUrl('/api/image-search/warmup'), { method: 'POST', cache: 'no-store' }).catch(
-      () => {}
-    )
+    const warmup = () => {
+      void fetch(apiUrl('/api/health'), { cache: 'no-store' }).catch(() => {})
+      void fetch(apiUrl('/api/image-search/warmup'), { method: 'POST', cache: 'no-store' }).catch(
+        () => {}
+      )
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warmup, { timeout: 8000 })
+      return () => window.cancelIdleCallback(id)
+    }
+
+    const t = window.setTimeout(warmup, 3000)
+    return () => window.clearTimeout(t)
   }, [])
 
   const catalog = useMemo(() => publicProducts(siteData.products), [siteData.products])

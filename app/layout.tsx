@@ -10,19 +10,13 @@ import {
   SITE_NAME_EN,
   SITE_URL,
 } from '@/lib/seo'
-import { getPublicSiteBootstrap, safeJsonForScript } from '@server/publicSiteBootstrap'
+import { tajawal, inter } from '@/lib/fonts'
+import { getPublicSiteBootstrap } from '@server/publicSiteBootstrap'
+import { optimizeImageUrl } from '@/utils/images'
 import './globals.css'
 
-import '@fontsource/tajawal/arabic-400.css'
-import '@fontsource/tajawal/arabic-500.css'
-import '@fontsource/tajawal/arabic-700.css'
-import '@fontsource/tajawal/latin-400.css'
-import '@fontsource/tajawal/latin-700.css'
-import '@fontsource/inter/latin-400.css'
-import '@fontsource/inter/latin-600.css'
-
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+/** ISR for public HTML — admin routes override with force-dynamic. */
+export const revalidate = 120
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -118,23 +112,27 @@ export const viewport: Viewport = {
 
 const themeScript = `(function(){try{var theme=localStorage.getItem('dorgham-cnc-theme');var isDark=theme==='dark'||(theme!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',isDark);document.documentElement.style.colorScheme=isDark?'dark':'light';}catch(e){}})();`
 
+function heroPreloadHref(src: string): string {
+  const resolved = src.startsWith('http') ? src : absoluteUrl(src)
+  return optimizeImageUrl(resolved, { width: 900, quality: 78 })
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const bootstrap = await getPublicSiteBootstrap()
+  const heroSrc = bootstrap?.home?.slideImages?.[0]
 
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={`${tajawal.variable} ${inter.variable}`}>
       <head>
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="preconnect" href={absoluteUrl('/')} />
+        {heroSrc ? (
+          <link rel="preload" as="image" href={heroPreloadHref(heroSrc)} fetchPriority="high" />
+        ) : null}
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
         </Script>
-        {bootstrap ? (
-          <Script id="site-bootstrap" strategy="beforeInteractive">
-            {`window.__DORGHAM_BOOTSTRAP__=${safeJsonForScript(bootstrap)};`}
-          </Script>
-        ) : null}
       </head>
       <body className="min-h-screen antialiased">
         <Providers initialSiteData={bootstrap}>{children}</Providers>

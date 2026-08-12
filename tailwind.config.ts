@@ -29,8 +29,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        arabic: ['Tajawal', 'system-ui', 'Segoe UI', 'sans-serif'],
-        english: ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'],
+        arabic: ['var(--font-tajawal)', 'Tajawal', 'system-ui', 'Segoe UI', 'sans-serif'],
+        english: ['var(--font-inter)', 'Inter', 'system-ui', 'Segoe UI', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

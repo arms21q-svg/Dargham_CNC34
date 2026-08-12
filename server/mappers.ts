@@ -70,9 +70,32 @@ function parseFloatLinks(raw: unknown, config: SiteConfig): FloatLink[] {
     },
   ]
 }
+/** Fields required to map DB rows to public SiteData products (vectors/hashes optional). */
+export type ProductMapperInput = Pick<
+  DbProduct,
+  | 'id'
+  | 'titleAr'
+  | 'titleEn'
+  | 'descriptionAr'
+  | 'descriptionEn'
+  | 'category'
+  | 'categoryId'
+  | 'displayNumber'
+  | 'image'
+  | 'images'
+  | 'materialsAr'
+  | 'materialsEn'
+  | 'dimensionsAr'
+  | 'dimensionsEn'
+  | 'featured'
+  | 'published'
+  | 'colors'
+  | 'sortOrder'
+>
+
 export function toSiteData(
   config: SiteConfig,
-  products: DbProduct[],
+  products: ProductMapperInput[],
   managers: DbManager[],
   categories: DbCategory[] = []
 ): SiteData {

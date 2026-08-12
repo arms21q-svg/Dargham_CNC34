@@ -99,7 +99,10 @@ export async function GET(req: NextRequest) {
       { ok: true, data: payload },
       {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Cache-Control': isAdmin
+            ? 'no-store, no-cache, must-revalidate'
+            : 'public, s-maxage=60, stale-while-revalidate=300',
+          Vary: 'Authorization',
         },
       }
     )

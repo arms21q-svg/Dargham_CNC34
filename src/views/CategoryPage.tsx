@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import DirectionalArrow from '../components/DirectionalArrow'
@@ -15,11 +15,18 @@ import {
 } from '../utils/categories'
 import { publicProducts } from '../utils/publicProducts'
 
+const PAGE_SIZE = 12
+
 export default function CategoryPage() {
   const params = useParams()
   const slug = typeof params?.slug === 'string' ? params.slug : ''
   const { lang, t } = useApp()
   const { siteData, loading } = useSiteData()
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [slug])
 
   const category = useMemo(
     () => getCategoryBySlug(siteData.categories ?? [], slug),
@@ -30,6 +37,9 @@ export default function CategoryPage() {
     if (!category) return []
     return productsInCategory(publicProducts(siteData.products), category.id)
   }, [category, siteData.products])
+
+  const visibleWorks = useMemo(() => works.slice(0, visibleCount), [works, visibleCount])
+  const hasMore = visibleCount < works.length
 
   const description = category?.description?.[lang]?.trim()
 
@@ -71,7 +81,20 @@ export default function CategoryPage() {
         {loading ? (
           <WorksCatalogSkeleton count={6} />
         ) : works.length > 0 ? (
-          <WorksCatalogGrid products={works} desktopCols={4} />
+          <>
+            <WorksCatalogGrid products={visibleWorks} desktopCols={4} />
+            {hasMore ? (
+              <div className="mt-8 text-center">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+                >
+                  {lang === 'ar' ? 'عرض المزيد' : 'Show more'}
+                </button>
+              </div>
+            ) : null}
+          </>
         ) : (
           <p className="text-center text-gray-500 dark:text-gray-400">{t.works.noResults}</p>
         )}

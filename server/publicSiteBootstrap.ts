@@ -1,10 +1,10 @@
-import { getCachedSiteData } from './cachedSiteData'
+import { getCachedPublicSiteData } from './cachedSiteData'
 import { lightPublicSiteData } from './lightSiteData'
 import type { SiteData } from '@/types/siteData'
 
 /** Server-side public payload for HTML bootstrap (no credentials, light images). */
 export async function getPublicSiteBootstrap(): Promise<SiteData | null> {
-  const data = await getCachedSiteData()
+  const data = await getCachedPublicSiteData()
   if (!data) return null
 
   const sanitized: SiteData = {

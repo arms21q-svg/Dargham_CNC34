@@ -143,6 +143,17 @@ export function SiteDataProvider({
   useEffect(() => {
     let cancelled = false
 
+    const token = getAuthToken()
+    const boot = resolveInitialSiteData(initialSiteData)
+
+    // Public visitors already have SSR bootstrap — skip redundant API round-trip.
+    if (boot && !token) {
+      setLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
     loadSiteData()
       .then((data) => {
         if (!cancelled) {
@@ -160,7 +171,7 @@ export function SiteDataProvider({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [initialSiteData])
 
   useEffect(() => {
     if (!authReady || !isAdmin) return

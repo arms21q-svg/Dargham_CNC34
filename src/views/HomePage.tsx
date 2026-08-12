@@ -1,13 +1,18 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMemo } from 'react'
 import Link from 'next/link'
 import DirectionalArrow from '../components/DirectionalArrow'
 import HeroSlider from '../components/HeroSlider'
-import CategoryGrid, { CategoryGridSkeleton } from '../components/CategoryGrid'
+import { CategoryGridSkeleton } from '../components/CategoryGrid'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 import { publicCategories } from '../utils/categories'
+
+const CategoryGrid = dynamic(() => import('../components/CategoryGrid'), {
+  loading: () => <CategoryGridSkeleton count={8} />,
+})
 
 export default function HomePage() {
   const { lang, t } = useApp()

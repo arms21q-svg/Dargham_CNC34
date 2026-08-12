@@ -35,16 +35,15 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     viewTransition: true,
-    optimizePackageImports: ['@fontsource/tajawal', '@fontsource/inter'],
   },
   images: {
+    loader: 'custom',
+    loaderFile: './src/lib/imageLoader.ts',
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'plus.unsplash.com' },
-      { protocol: 'https', hostname: '**.supabase.co' },
-      { protocol: 'https', hostname: '**.imgix.net' },
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
     ],
   },
   async redirects() {
@@ -69,12 +68,25 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate',
+            value: 'public, s-maxage=60, stale-while-revalidate=300',
+          },
+          {
+            key: 'Vary',
+            value: 'Authorization',
           },
         ],
       },
       {
         source: '/api/products/:id/image',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+      {
+        source: '/api/categories/:id/image',
         headers: [
           {
             key: 'Cache-Control',

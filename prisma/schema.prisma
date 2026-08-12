@@ -70,13 +70,36 @@ model AdminAuditLog {
   @@index([action])
 }
 
+model PortfolioCategory {
+  id            String    @id
+  slug          String    @unique
+  titleAr       String
+  titleEn       String
+  descriptionAr String    @default("")
+  descriptionEn String    @default("")
+  image         String    @default("")
+  enabled       Boolean   @default(true)
+  sortOrder     Int       @default(0)
+  products      Product[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([enabled, sortOrder])
+  @@index([sortOrder])
+}
+
 model Product {
   id            String   @id
   titleAr       String
   titleEn       String
-  descriptionAr String
-  descriptionEn String
+  descriptionAr String   @default("")
+  descriptionEn String   @default("")
+  /** Legacy slug mirror — kept for search / related works */
   category      String
+  categoryId    String?
+  categoryRef   PortfolioCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  /** Per-category display number (not the DB id) */
+  displayNumber Int      @default(0)
   image         String
   materialsAr   String
   materialsEn   String
@@ -99,6 +122,8 @@ model Product {
 
   @@index([featured, sortOrder])
   @@index([category, sortOrder])
+  @@index([categoryId, displayNumber])
+  @@index([categoryId, sortOrder])
   @@index([category, featured, sortOrder])
   @@index([published, sortOrder])
   @@index([sortOrder])

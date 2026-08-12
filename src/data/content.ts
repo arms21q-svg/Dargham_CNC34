@@ -15,6 +15,7 @@ export interface Translations {
     ourWorks: string
     viewAll: string
     featuredWorks: string
+    browseByCategory: string
   }
   works: {
     title: string
@@ -22,6 +23,9 @@ export interface Translations {
     featured: string
     allWorks: string
     categories: string
+    browseByCategory: string
+    otherCategories: string
+    imageSearchLink: string
     search: string
     searchPlaceholder: string
     searchByImage: string
@@ -94,6 +98,7 @@ export const translations: Record<Lang, Translations> = {
       ourWorks: 'أعمالنا',
       viewAll: 'عرض جميع الأعمال',
       featuredWorks: 'أعمال مميزة',
+      browseByCategory: 'تصفح حسب التصنيف',
     },
     works: {
       title: 'أعمالنا',
@@ -101,6 +106,9 @@ export const translations: Record<Lang, Translations> = {
       featured: 'أعمال مميزة',
       allWorks: 'جميع الأعمال',
       categories: 'التصنيفات',
+      browseByCategory: 'تصفح حسب التصنيف',
+      otherCategories: 'تصنيفات أخرى',
+      imageSearchLink: 'البحث بالصورة في جميع الأعمال',
       search: 'بحث',
       searchPlaceholder: 'ابحث عن تصميم...',
       searchByImage: 'البحث بواسطة الصورة',
@@ -172,6 +180,7 @@ export const translations: Record<Lang, Translations> = {
       ourWorks: 'Our Works',
       viewAll: 'View All Works',
       featuredWorks: 'Featured Works',
+      browseByCategory: 'Browse by Category',
     },
     works: {
       title: 'Our Works',
@@ -179,6 +188,9 @@ export const translations: Record<Lang, Translations> = {
       featured: 'Featured Works',
       allWorks: 'All Works',
       categories: 'Categories',
+      browseByCategory: 'Browse by Category',
+      otherCategories: 'Other categories',
+      imageSearchLink: 'Search all works by image',
       search: 'Search',
       searchPlaceholder: 'Search for a design...',
       searchByImage: 'Search by image',
@@ -265,22 +277,41 @@ export const categoryLabels: Record<Lang, Record<Category, string>> = {
 
 export interface Product {
   id: string
+  categoryId: string
+  /** Legacy slug mirror for search */
+  category?: Category
+  /** Auto display number within category */
+  displayNumber: number
   title: { ar: string; en: string }
-  description: { ar: string; en: string }
-  category: Category
+  description?: { ar: string; en: string }
   /** Primary / cover image */
   image: string
   /** Full gallery (includes primary) */
   images?: string[]
+  materials?: { ar: string; en: string }
+  dimensions?: { ar: string; en: string }
+  featured?: boolean
+  /** Visible on public site when true */
+  published?: boolean
+  colors?: string[]
+}
+
+/** Legacy seed rows — migrated to categoryId + displayNumber in defaultSiteData */
+type SeedProduct = {
+  id: string
+  title: { ar: string; en: string }
+  description: { ar: string; en: string }
+  category: Category
+  image: string
+  images?: string[]
   materials: { ar: string; en: string }
   dimensions: { ar: string; en: string }
-  featured: boolean
-  /** Visible on public site when true */
+  featured?: boolean
   published?: boolean
   colors: string[]
 }
 
-export const products: Product[] = [
+export const seedProducts: SeedProduct[] = [
   {
     id: '1',
     title: { ar: 'لوحة عربية فاخرة', en: 'Luxury Arabic Panel' },

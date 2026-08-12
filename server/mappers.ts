@@ -1,6 +1,7 @@
-import type { Manager as DbManager, Product as DbProduct, SiteConfig } from '@prisma/client'
+import type { Manager as DbManager, PortfolioCategory as DbCategory, Product as DbProduct, SiteConfig } from '@prisma/client'
 import { createDefaultAboutSettings } from '../src/data/defaultSiteData'
-import type { AboutSettings, FloatLink, SiteData } from '../src/types/siteData'
+import { createDefaultCategories } from '../src/data/defaultCategories'
+import type { AboutSettings, FloatLink, PortfolioCategory, SiteData } from '../src/types/siteData'
 
 function parseAbout(raw: unknown): AboutSettings {
   const defaults = createDefaultAboutSettings()
@@ -72,8 +73,23 @@ function parseFloatLinks(raw: unknown, config: SiteConfig): FloatLink[] {
 export function toSiteData(
   config: SiteConfig,
   products: DbProduct[],
-  managers: DbManager[]
+  managers: DbManager[],
+  categories: DbCategory[] = []
 ): SiteData {
+  const defaultCategories = createDefaultCategories()
+  const categoryRows: PortfolioCategory[] =
+    categories.length > 0
+      ? categories.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          title: { ar: c.titleAr, en: c.titleEn },
+          description: { ar: c.descriptionAr, en: c.descriptionEn },
+          image: c.image,
+          enabled: c.enabled,
+          sortOrder: c.sortOrder,
+        }))
+      : defaultCategories
+
   return {
     version: config.version,
     updatedAt: config.updatedAt.getTime(),
@@ -99,6 +115,7 @@ export function toSiteData(
         },
       },
     },
+    categories: categoryRows,
     products: products.map((p) => {
       const images =
         Array.isArray(p.images) && p.images.length > 0
@@ -106,11 +123,17 @@ export function toSiteData(
           : p.image
             ? [p.image]
             : []
+      const description =
+        p.descriptionAr.trim() || p.descriptionEn.trim()
+          ? { ar: p.descriptionAr, en: p.descriptionEn }
+          : undefined
       return {
         id: p.id,
-        title: { ar: p.titleAr, en: p.titleEn },
-        description: { ar: p.descriptionAr, en: p.descriptionEn },
+        categoryId: p.categoryId ?? categoryRows[0]?.id ?? '',
         category: p.category as SiteData['products'][0]['category'],
+        displayNumber: p.displayNumber ?? 0,
+        title: { ar: p.titleAr, en: p.titleEn },
+        description,
         image: p.image || images[0] || '',
         images,
         materials: { ar: p.materialsAr, en: p.materialsEn },
@@ -173,7 +196,11 @@ export function configFromSiteData(data: SiteData, passwordHash: string) {
   }
 }
 
-export function productFromSiteData(p: SiteData['products'][0], index: number) {
+export function productFromSiteData(
+  p: SiteData['products'][0],
+  index: number,
+  categories: PortfolioCategory[] = []
+) {
   const gallery =
     Array.isArray(p.images) && p.images.length > 0
       ? p.images.filter(Boolean)
@@ -184,6 +211,8 @@ export function productFromSiteData(p: SiteData['products'][0], index: number) {
   const images = primary
     ? [primary, ...gallery.filter((url) => url && url !== primary)]
     : gallery
+  const category = categories.find((c) => c.id === p.categoryId)
+  const categorySlug = category?.slug ?? p.category ?? 'decor'
 
   return {
     id: String(p.id || `product-${index + 1}`),
@@ -191,7 +220,9 @@ export function productFromSiteData(p: SiteData['products'][0], index: number) {
     titleEn: p.title?.en ?? '',
     descriptionAr: p.description?.ar ?? '',
     descriptionEn: p.description?.en ?? '',
-    category: p.category || 'decor',
+    category: categorySlug,
+    categoryId: p.categoryId || category?.id || null,
+    displayNumber: p.displayNumber ?? 0,
     image: primary,
     images,
     materialsAr: p.materials?.ar ?? '',
@@ -201,6 +232,20 @@ export function productFromSiteData(p: SiteData['products'][0], index: number) {
     featured: Boolean(p.featured),
     published: p.published !== false,
     colors: Array.isArray(p.colors) ? p.colors : [],
+    sortOrder: index,
+  }
+}
+
+export function categoryFromSiteData(c: PortfolioCategory, index: number) {
+  return {
+    id: String(c.id || `cat-${index + 1}`),
+    slug: c.slug,
+    titleAr: c.title?.ar ?? '',
+    titleEn: c.title?.en ?? '',
+    descriptionAr: c.description?.ar ?? '',
+    descriptionEn: c.description?.en ?? '',
+    image: c.image ?? '',
+    enabled: c.enabled !== false,
     sortOrder: index,
   }
 }

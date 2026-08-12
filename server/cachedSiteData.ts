@@ -3,14 +3,15 @@ import { prisma } from './db'
 import type { SiteData } from '@/types/siteData'
 
 async function fetchSiteDataRaw(): Promise<SiteData | null> {
-  const [config, products, managers] = await Promise.all([
+  const [config, products, managers, categories] = await Promise.all([
     prisma.siteConfig.findUnique({ where: { id: 1 } }),
     prisma.product.findMany({ orderBy: { sortOrder: 'asc' } }),
     prisma.manager.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.portfolioCategory.findMany({ orderBy: { sortOrder: 'asc' } }),
   ])
   if (!config) return null
   const { toSiteData } = await import('./mappers')
-  return toSiteData(config, products, managers)
+  return toSiteData(config, products, managers, categories)
 }
 
 /** Bypass unstable_cache — read directly from DB (e.g. right after publish). */

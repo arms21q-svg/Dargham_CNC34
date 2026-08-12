@@ -4,20 +4,20 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import DirectionalArrow from '../components/DirectionalArrow'
 import HeroSlider from '../components/HeroSlider'
-import WorksCatalogGrid, { WorksCatalogSkeleton } from '../components/WorksCatalogGrid'
+import CategoryGrid, { CategoryGridSkeleton } from '../components/CategoryGrid'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
-import { publicProducts } from '../utils/publicProducts'
+import { publicCategories } from '../utils/categories'
 
 export default function HomePage() {
   const { lang, t } = useApp()
   const { siteData, loading } = useSiteData()
-  const featured = useMemo(
-    () => publicProducts(siteData.products).filter((p) => p.featured),
-    [siteData.products]
+  const categories = useMemo(
+    () => publicCategories(siteData.categories ?? []),
+    [siteData.categories]
   )
   const home = siteData.home
-  const showFeatured = loading || featured.length > 0
+  const showCategories = loading || categories.length > 0
 
   return (
     <>
@@ -48,7 +48,7 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Link href="/works" className="btn-primary min-w-[140px]">
+                <Link href="/categories" className="btn-primary min-w-[140px]">
                   {t.home.ourWorks}
                 </Link>
                 <Link href="/contact" className="btn-secondary min-w-[140px]">
@@ -60,12 +60,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {showFeatured && (
+      {showCategories && (
         <section className="section-padding bg-black md:bg-primary-50/50 dark:md:bg-primary-950/30">
           <div className="container-main">
             <div className="mb-6 md:mb-10">
               <h2 className="text-3xl font-bold text-white md:text-gray-800 dark:md:text-gray-100">
-                {t.home.featuredWorks}
+                {t.home.browseByCategory}
               </h2>
               <p className="mt-2 hidden text-base text-gray-600 md:block dark:text-gray-400">
                 {t.works.subtitle}
@@ -73,18 +73,14 @@ export default function HomePage() {
             </div>
 
             {loading ? (
-              featured.length > 0 ? (
-                <WorksCatalogGrid products={featured} desktopCols={4} />
-              ) : (
-                <WorksCatalogSkeleton count={4} desktopCols={4} />
-              )
+              <CategoryGridSkeleton count={8} />
             ) : (
-              <WorksCatalogGrid products={featured} desktopCols={4} />
+              <CategoryGrid categories={categories} lang={lang} />
             )}
 
             <div className="mt-8 text-center">
-              <Link href="/works" className="btn-secondary group">
-                {t.nav.works}
+              <Link href="/categories" className="btn-secondary group">
+                {t.home.viewAll}
                 <DirectionalArrow direction="forward" />
               </Link>
             </div>

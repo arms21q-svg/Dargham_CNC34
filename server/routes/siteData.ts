@@ -20,7 +20,7 @@ function sanitizePublicSiteData(data: SiteData): SiteData {
 }
 
 async function fetchSiteData() {
-  const [config, products, managers] = await Promise.all([
+  const [config, products, managers, categories] = await Promise.all([
     prisma.siteConfig.findUnique({ where: { id: 1 } }),
     prisma.product.findMany({
       orderBy: { sortOrder: 'asc' },
@@ -28,10 +28,13 @@ async function fetchSiteData() {
     prisma.manager.findMany({
       orderBy: { sortOrder: 'asc' },
     }),
+    prisma.portfolioCategory.findMany({
+      orderBy: { sortOrder: 'asc' },
+    }),
   ])
 
   if (!config) return null
-  return toSiteData(config, products, managers)
+  return toSiteData(config, products, managers, categories)
 }
 
 router.get('/', async (_req, res) => {

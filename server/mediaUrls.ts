@@ -14,17 +14,23 @@ export function slideImageUrl(index: number): string {
   return `/api/site/slides/${index}/image`
 }
 
+export function categoryImageUrl(categoryId: string): string {
+  return `/api/categories/${encodeURIComponent(categoryId)}/image`
+}
+
 /** Replace embedded base64 with lightweight proxy URLs for public pages. */
 export function toPublicMediaUrl(
   ownerId: string,
   url: string | undefined,
   index = 0,
-  kind: 'product' | 'slide' = 'product'
+  kind: 'product' | 'slide' | 'category' = 'product'
 ): string {
   if (!url) return ''
   if (isProxyMediaUrl(url)) return ''
   if (isHeavyDataUrl(url)) {
-    return kind === 'slide' ? slideImageUrl(index) : productImageUrl(ownerId, index)
+    if (kind === 'slide') return slideImageUrl(index)
+    if (kind === 'category') return categoryImageUrl(ownerId)
+    return productImageUrl(ownerId, index)
   }
   return url
 }
@@ -32,7 +38,11 @@ export function toPublicMediaUrl(
 /** Public /api/.../image paths — not storable or serveable without real pixels in DB. */
 export function isProxyMediaUrl(url: string | undefined): boolean {
   if (!url) return false
-  return url.startsWith('/api/products/') || url.startsWith('/api/site/slides/')
+  return (
+    url.startsWith('/api/products/') ||
+    url.startsWith('/api/site/slides/') ||
+    url.startsWith('/api/categories/')
+  )
 }
 
 export function isServeableMediaUrl(url: string | undefined): boolean {

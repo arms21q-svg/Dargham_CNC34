@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { SiteData, Manager, Product } from '../types/siteData'
+import type { SiteData, Manager, Product, PortfolioCategory } from '../types/siteData'
 import type { HomeSettings, ContactSettings } from '../types/siteData'
 import {
   createDefaultSiteData,
@@ -51,6 +51,10 @@ interface SiteDataContextType {
   addProduct: (product: Product) => void
   updateProduct: (product: Product) => void
   deleteProduct: (id: string) => void
+  updateCategories: (categories: PortfolioCategory[]) => void
+  addCategory: (category: PortfolioCategory) => void
+  updateCategory: (category: PortfolioCategory) => void
+  deleteCategory: (id: string) => void
   updateManagers: (managers: Manager[]) => void
   addManager: (manager: Manager) => void
   updateManager: (manager: Manager) => void
@@ -77,6 +81,7 @@ function patchData(prev: SiteData, patch: Partial<SiteData>): SiteData {
     contact: { ...prev.contact, ...patch.contact },
     settings: { ...prev.settings, ...patch.settings },
     products: patch.products ?? prev.products,
+    categories: patch.categories ?? prev.categories,
     managers: patch.managers ?? prev.managers,
   }
 }
@@ -285,6 +290,31 @@ export function SiteDataProvider({
     )
   }, [])
 
+  const updateCategories = useCallback((categories: PortfolioCategory[]) => {
+    setSiteData((prev) => patchData(prev, { categories }))
+  }, [])
+
+  const addCategory = useCallback((category: PortfolioCategory) => {
+    setSiteData((prev) => patchData(prev, { categories: [...prev.categories, category] }))
+  }, [])
+
+  const updateCategory = useCallback((category: PortfolioCategory) => {
+    setSiteData((prev) =>
+      patchData(prev, {
+        categories: prev.categories.map((c) => (c.id === category.id ? category : c)),
+      })
+    )
+  }, [])
+
+  const deleteCategory = useCallback((id: string) => {
+    setSiteData((prev) =>
+      patchData(prev, {
+        categories: prev.categories.filter((c) => c.id !== id),
+        products: prev.products.filter((p) => p.categoryId !== id),
+      })
+    )
+  }, [])
+
   const updateManagers = useCallback((managers: Manager[]) => {
     setSiteData((prev) => patchData(prev, { managers }))
   }, [])
@@ -357,6 +387,10 @@ export function SiteDataProvider({
         addProduct,
         updateProduct,
         deleteProduct,
+        updateCategories,
+        addCategory,
+        updateCategory,
+        deleteCategory,
         updateManagers,
         addManager,
         updateManager,

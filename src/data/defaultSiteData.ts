@@ -1,5 +1,6 @@
-import { products, slideImages, translations } from './content'
-import type { AboutSettings, SiteData } from '../types/siteData'
+import { seedProducts, slideImages, translations } from './content'
+import { createDefaultCategories, LEGACY_CATEGORY_SLUG } from './defaultCategories'
+import type { PortfolioCategory, Product, SiteData } from '../types/siteData'
 
 export const DEFAULT_ADMIN_EMAIL = 'admin@dhirghamcnc.com'
 
@@ -7,7 +8,7 @@ export const DEFAULT_ABOUT_IMAGE =
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80'
 
 /** Kept for DB/API compatibility; About page is no longer public. */
-export function createDefaultAboutSettings(): AboutSettings {
+export function createDefaultAboutSettings(): SiteData['about'] {
   return {
     title: { ar: 'من نحن', en: 'About Us' },
     subtitle: { ar: 'قصة شغف بالخشب والإبداع', en: 'A story of passion for wood and creativity' },
@@ -36,9 +37,38 @@ export function createDefaultAboutSettings(): AboutSettings {
   }
 }
 
+function migrateSeedProducts(categories: PortfolioCategory[]): Product[] {
+  const slugToId = new Map(categories.map((c) => [c.slug, c.id]))
+  const counters = new Map<string, number>()
+
+  return seedProducts.map((p) => {
+    const slug = LEGACY_CATEGORY_SLUG[p.category] ?? categories[0]?.slug ?? 'decor'
+    const categoryId = slugToId.get(slug) ?? categories[0]?.id ?? 'cat-decor'
+    const next = (counters.get(categoryId) ?? 0) + 1
+    counters.set(categoryId, next)
+
+    return {
+      id: p.id,
+      categoryId,
+      category: p.category,
+      displayNumber: next,
+      title: p.title,
+      description: p.description,
+      image: p.image,
+      images: p.images,
+      materials: p.materials,
+      dimensions: p.dimensions,
+      featured: p.featured ?? false,
+      published: p.published !== false,
+      colors: p.colors,
+    }
+  })
+}
+
 export function createDefaultSiteData(): SiteData {
   const ar = translations.ar
   const en = translations.en
+  const categories = createDefaultCategories()
 
   return {
     version: 1,
@@ -63,11 +93,12 @@ export function createDefaultSiteData(): SiteData {
         enabled: true,
         welcomeMessage: {
           ar: 'مرحباً! أنا مساعد ضرغام CNC. اسألني عن أعمالنا، الأسعار، أو الخدمات.',
-          en: 'Hello! I am Dorgham CNC assistant. Ask me about our works, prices, or services.',
+          en: 'Hello! I am Dorgham CNC assistant. Ask about our works, prices, or services.',
         },
       },
     },
-    products: JSON.parse(JSON.stringify(products)),
+    categories,
+    products: migrateSeedProducts(categories),
     managers: [],
     settings: {
       adminEmail: DEFAULT_ADMIN_EMAIL,

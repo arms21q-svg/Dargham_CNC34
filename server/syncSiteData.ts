@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from './db'
 import {
   configFromSiteData,
+  categoryFromSiteData,
   managerFromSiteData,
   productFromSiteData,
 } from './mappers'
@@ -10,6 +11,7 @@ import type { SiteData } from '../src/types/siteData'
 
 type ProductRow = ReturnType<typeof productFromSiteData>
 type ManagerRow = ReturnType<typeof managerFromSiteData>
+type CategoryRow = ReturnType<typeof categoryFromSiteData>
 
 /** Never overwrite stored base64/URL with public proxy paths from a stripped client payload. */
 function preserveStoredMedia(incoming: string, stored: string): string {
@@ -46,6 +48,41 @@ function sameStringArray(a: string[] | undefined, b: string[] | undefined): bool
   return left.every((v, i) => v === right[i])
 }
 
+function applyStoredCategoryMedia(
+  row: CategoryRow,
+  prev: { image: string }
+): CategoryRow {
+  return {
+    ...row,
+    image: preserveStoredMedia(row.image, prev.image),
+  }
+}
+
+function categoryContentEqual(
+  prev: {
+    slug: string
+    titleAr: string
+    titleEn: string
+    descriptionAr: string
+    descriptionEn: string
+    image: string
+    enabled: boolean
+    sortOrder: number
+  },
+  next: CategoryRow
+): boolean {
+  return (
+    prev.slug === next.slug &&
+    prev.titleAr === next.titleAr &&
+    prev.titleEn === next.titleEn &&
+    prev.descriptionAr === next.descriptionAr &&
+    prev.descriptionEn === next.descriptionEn &&
+    prev.image === next.image &&
+    prev.enabled === next.enabled &&
+    prev.sortOrder === next.sortOrder
+  )
+}
+
 function productContentEqual(
   prev: {
     titleAr: string
@@ -53,6 +90,8 @@ function productContentEqual(
     descriptionAr: string
     descriptionEn: string
     category: string
+    categoryId: string | null
+    displayNumber: number
     image: string
     images: string[]
     materialsAr: string
@@ -72,6 +111,8 @@ function productContentEqual(
     prev.descriptionAr === next.descriptionAr &&
     prev.descriptionEn === next.descriptionEn &&
     prev.category === next.category &&
+    (prev.categoryId ?? null) === (next.categoryId ?? null) &&
+    prev.displayNumber === next.displayNumber &&
     prev.image === next.image &&
     sameStringArray(prev.images, next.images) &&
     prev.materialsAr === next.materialsAr &&
@@ -123,10 +164,12 @@ export async function syncSiteDataToDb(
   body: SiteData,
   passwordHash: string
 ): Promise<SyncSiteDataResult> {
-  const products = body.products.map((p, i) => productFromSiteData(p, i))
+  const categories = (body.categories ?? []).map((c, i) => categoryFromSiteData(c, i))
+  const products = body.products.map((p, i) => productFromSiteData(p, i, body.categories ?? []))
   const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
 
-  const [existingConfig, existingProducts, existingManagers] = await Promise.all([
+  const [existingConfig, existingProducts, existingManagers, existingCategories] =
+    await Promise.all([
     prisma.siteConfig.findUnique({
       where: { id: 1 },
       select: { slideImages: true },
@@ -139,6 +182,8 @@ export async function syncSiteDataToDb(
         descriptionAr: true,
         descriptionEn: true,
         category: true,
+        categoryId: true,
+        displayNumber: true,
         image: true,
         images: true,
         materialsAr: true,
@@ -163,6 +208,19 @@ export async function syncSiteDataToDb(
         sortOrder: true,
       },
     }),
+    prisma.portfolioCategory.findMany({
+      select: {
+        id: true,
+        slug: true,
+        titleAr: true,
+        titleEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        image: true,
+        enabled: true,
+        sortOrder: true,
+      },
+    }),
   ])
 
   const configData = configFromSiteData(body, passwordHash)
@@ -175,15 +233,34 @@ export async function syncSiteDataToDb(
 
   const prevProductById = new Map(existingProducts.map((p) => [p.id, p]))
   const prevManagerById = new Map(existingManagers.map((m) => [m.id, m]))
+  const prevCategoryById = new Map(existingCategories.map((c) => [c.id, c]))
   const nextProductIds = new Set(products.map((p) => p.id))
   const nextManagerIds = new Set(managers.map((m) => m.id))
+  const nextCategoryIds = new Set(categories.map((c) => c.id))
 
+  const categoryIdsToDelete = existingCategories
+    .filter((c) => !nextCategoryIds.has(c.id))
+    .map((c) => c.id)
   const productIdsToDelete = existingProducts
     .filter((p) => !nextProductIds.has(p.id))
     .map((p) => p.id)
   const managerIdsToDelete = existingManagers
     .filter((m) => !nextManagerIds.has(m.id))
     .map((m) => m.id)
+
+  const categoriesToCreate: CategoryRow[] = []
+  const categoriesToUpdate: CategoryRow[] = []
+
+  for (const c of categories) {
+    const prev = prevCategoryById.get(c.id)
+    const row = prev ? applyStoredCategoryMedia(c, prev) : c
+    if (!prev) {
+      categoriesToCreate.push(row)
+      continue
+    }
+    if (categoryContentEqual(prev, row)) continue
+    categoriesToUpdate.push(row)
+  }
 
   const productsToCreate: ProductRow[] = []
   const productsToUpdate: ProductRow[] = []
@@ -231,15 +308,33 @@ export async function syncSiteDataToDb(
       if (productIdsToDelete.length > 0) {
         await tx.product.deleteMany({ where: { id: { in: productIdsToDelete } } })
       }
+      if (categoryIdsToDelete.length > 0) {
+        await tx.product.deleteMany({ where: { categoryId: { in: categoryIdsToDelete } } })
+        await tx.portfolioCategory.deleteMany({ where: { id: { in: categoryIdsToDelete } } })
+      }
       if (managerIdsToDelete.length > 0) {
         await tx.manager.deleteMany({ where: { id: { in: managerIdsToDelete } } })
       }
 
+      if (categoriesToCreate.length > 0) {
+        await tx.portfolioCategory.createMany({ data: categoriesToCreate })
+      }
       if (productsToCreate.length > 0) {
         await tx.product.createMany({ data: productsToCreate })
       }
       if (managersToCreate.length > 0) {
         await tx.manager.createMany({ data: managersToCreate })
+      }
+
+      if (categoriesToUpdate.length > 0) {
+        await Promise.all(
+          categoriesToUpdate.map((c) =>
+            tx.portfolioCategory.update({
+              where: { id: c.id },
+              data: c,
+            })
+          )
+        )
       }
 
       if (productsToUpdate.length > 0) {

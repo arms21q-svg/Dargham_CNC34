@@ -16,6 +16,8 @@ export const PRODUCT_DETAIL_SELECT = {
   dimensionsAr: true,
   dimensionsEn: true,
   category: true,
+  categoryId: true,
+  displayNumber: true,
   featured: true,
   published: true,
   colors: true,
@@ -35,6 +37,8 @@ export const PRODUCT_CARD_SELECT = {
   dimensionsAr: true,
   dimensionsEn: true,
   category: true,
+  categoryId: true,
+  displayNumber: true,
   featured: true,
   published: true,
   colors: true,
@@ -53,6 +57,8 @@ export type ProductDetailRow = {
   dimensionsAr: string
   dimensionsEn: string
   category: string
+  categoryId: string | null
+  displayNumber: number
   featured: boolean
   published: boolean
   colors: string[]

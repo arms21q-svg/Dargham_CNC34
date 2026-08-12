@@ -5,29 +5,25 @@ import { useSearchParams } from 'next/navigation'
 import WorksCatalogGrid from '../components/WorksCatalogGrid'
 import WorksSearchBar, { type WorksImageSearchResult } from '../components/WorksSearchBar'
 import WorksSearchResultCard from '../components/WorksSearchResultCard'
-import { categoryLabels, type Category, type Product } from '../data/content'
+import { categoryTitle, publicCategories } from '../utils/categories'
+import type { Product } from '../data/content'
 import { apiUrl } from '../utils/apiBase'
 import { searchProductsByText } from '../utils/productTextSearch'
 import { publicProducts } from '../utils/publicProducts'
 import { useApp } from '../context/AppContext'
 import { useSiteData } from '../context/SiteDataContext'
 
-const categories: (Category | 'all')[] = [
-  'all',
-  'wallArt',
-  'furniture',
-  'decor',
-  'doors',
-  'panels',
-  'custom',
-]
-
 export default function AllWorksPage() {
   const { lang, t } = useApp()
   const { siteData } = useSiteData()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
-  const [category, setCategory] = useState<Category | 'all'>('all')
+
+  const categoryOptions = useMemo(
+    () => [{ id: 'all', label: t.works.filterAll }, ...publicCategories(siteData.categories ?? []).map((c) => ({ id: c.id, label: categoryTitle(c, lang) }))],
+    [siteData.categories, lang, t.works.filterAll]
+  )
+  const [category, setCategory] = useState<string>('all')
   const [imageSearch, setImageSearch] = useState<WorksImageSearchResult | null>(null)
 
   // Warm DB + pre-index images before first visual search (runs in parallel, non-blocking)
@@ -41,12 +37,12 @@ export default function AllWorksPage() {
   const catalog = useMemo(() => publicProducts(siteData.products), [siteData.products])
 
   const catalogBase = useMemo(() => {
-    return category === 'all' ? catalog : catalog.filter((p) => p.category === category)
+    return category === 'all' ? catalog : catalog.filter((p) => p.categoryId === category)
   }, [catalog, category])
 
   const textHits = useMemo(
-    () => searchProductsByText(catalogBase, search, lang),
-    [catalogBase, search, lang]
+    () => searchProductsByText(catalogBase, search, lang, siteData.categories ?? []),
+    [catalogBase, search, lang, siteData.categories]
   )
 
   const textScoresById = useMemo(() => {
@@ -121,21 +117,21 @@ export default function AllWorksPage() {
 
           {!isImageMode && (
             <div className="mb-5 flex flex-wrap gap-2 md:mb-8">
-              {categories.map((cat) => (
+              {categoryOptions.map((cat) => (
                 <button
-                  key={cat}
+                  key={cat.id}
                   type="button"
                   onClick={() => {
-                    setCategory(cat)
+                    setCategory(cat.id)
                     setImageSearch(null)
                   }}
                   className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:py-2 sm:text-sm ${
-                    category === cat
+                    category === cat.id
                       ? 'bg-primary-600 text-white shadow-md'
                       : 'bg-white/10 text-white/80 hover:bg-white/15 md:bg-gray-100 md:text-gray-600 md:hover:bg-gray-200 dark:md:bg-gray-800 dark:md:text-gray-300 dark:md:hover:bg-gray-700'
                   }`}
                 >
-                  {cat === 'all' ? t.works.filterAll : categoryLabels[lang][cat]}
+                  {cat.label}
                 </button>
               ))}
             </div>

@@ -59,13 +59,21 @@ function ProductCard({
               sizes="50vw"
               className="h-full w-full object-cover transition-transform duration-300 group-active:scale-[1.02]"
             />
+            {product.displayNumber > 0 && (
+              <span className="absolute end-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">
+                {product.displayNumber}
+              </span>
+            )}
             {typeof similarityScore === 'number' && (
               <span className="absolute start-2 top-2 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white">
                 {similarityScore}%
               </span>
             )}
           </div>
-          <div className="flex min-h-[2.75rem] items-center justify-center px-2.5 py-2.5">
+          <div className="flex min-h-[2.75rem] flex-col items-center justify-center px-2.5 py-2.5">
+            {product.displayNumber > 0 && (
+              <span className="mb-0.5 text-[10px] font-bold text-primary-400">#{product.displayNumber}</span>
+            )}
             <h3 className="line-clamp-2 text-xs font-semibold leading-snug text-white sm:text-sm">
               {product.title[lang]}
             </h3>
@@ -100,7 +108,7 @@ function ProductCard({
             </Link>
 
             <p className="mb-3 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
-              {product.description[lang]}
+              {product.description?.[lang]}
             </p>
 
             <div className="flex items-center justify-end gap-2">
@@ -175,7 +183,7 @@ function ProductCard({
         </Link>
 
         <p className="mb-3 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
-          {product.description[lang]}
+          {product.description?.[lang]}
         </p>
 
         <div className="flex items-center justify-end gap-2">

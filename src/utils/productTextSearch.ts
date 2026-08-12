@@ -1,5 +1,7 @@
 import type { Product } from '../data/content'
-import { categoryLabels, type Category, type Lang } from '../data/content'
+import type { PortfolioCategory } from '../types/siteData'
+import type { Lang } from '../data/content'
+import { categoryTitle, getCategoryById } from './categories'
 
 /** Normalize Arabic/English for more reliable matching */
 export function normalizeSearchText(input: string): string {
@@ -35,7 +37,8 @@ export type TextSearchHit = {
 export function searchProductsByText(
   products: Product[],
   query: string,
-  lang: Lang
+  lang: Lang,
+  categories: PortfolioCategory[] = []
 ): TextSearchHit[] {
   const q = normalizeSearchText(query)
   if (!q) {
@@ -49,17 +52,18 @@ export function searchProductsByText(
     const title = normalizeSearchText(product.title[lang])
     const titleAlt = normalizeSearchText(product.title[lang === 'ar' ? 'en' : 'ar'])
     const materials = normalizeSearchText(
-      `${product.materials.ar} ${product.materials.en}`
+      `${product.materials?.ar ?? ''} ${product.materials?.en ?? ''}`
     )
     const description = normalizeSearchText(
-      `${product.description.ar} ${product.description.en}`
+      `${product.description?.ar ?? ''} ${product.description?.en ?? ''}`
     )
     const dimensions = normalizeSearchText(
-      `${product.dimensions.ar} ${product.dimensions.en}`
+      `${product.dimensions?.ar ?? ''} ${product.dimensions?.en ?? ''}`
     )
-    const categoryAr = normalizeSearchText(categoryLabels.ar[product.category as Category] ?? '')
-    const categoryEn = normalizeSearchText(categoryLabels.en[product.category as Category] ?? '')
-    const categoryRaw = normalizeSearchText(product.category)
+    const cat = getCategoryById(categories, product.categoryId)
+    const categoryAr = normalizeSearchText(categoryTitle(cat, 'ar'))
+    const categoryEn = normalizeSearchText(categoryTitle(cat, 'en'))
+    const categoryRaw = normalizeSearchText(product.category ?? '')
     const hayAll = [title, titleAlt, materials, description, dimensions, categoryAr, categoryEn, categoryRaw].join(' ')
 
     // Every token must appear somewhere

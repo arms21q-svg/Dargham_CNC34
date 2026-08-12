@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import DirectionalArrow from '../components/DirectionalArrow'
 import ProductCard from '../components/ProductCard'
-import OptimizedImage from '../components/OptimizedImage'
-import { categoryLabels, type Product } from '../data/content'
+import ProductGallery from '../components/ProductGallery'
+import type { Product } from '../data/content'
+import { categoryTitle, getCategoryById } from '../utils/categories'
+import { useSiteData } from '../context/SiteDataContext'
 import { downloadImage } from '../utils/imageSearch'
 import { apiUrl } from '../utils/apiBase'
 import { useApp } from '../context/AppContext'
@@ -18,22 +20,33 @@ type InitialProduct = {
   descriptionAr: string
   descriptionEn: string
   image: string
+  images?: string[]
   materialsAr: string
   materialsEn: string
   dimensionsAr: string
   dimensionsEn: string
   category: string
+  categoryId?: string | null
+  displayNumber?: number
   featured: boolean
   colors: string[]
 }
 
 function toProduct(p: InitialProduct): Product {
+  const description =
+    p.descriptionAr.trim() || p.descriptionEn.trim()
+      ? { ar: p.descriptionAr, en: p.descriptionEn || p.descriptionAr }
+      : undefined
+  const gallery = (p.images ?? []).filter(Boolean)
   return {
     id: p.id,
-    title: { ar: p.titleAr, en: p.titleEn || p.titleAr },
-    description: { ar: p.descriptionAr, en: p.descriptionEn || p.descriptionAr },
+    categoryId: p.categoryId ?? '',
     category: p.category as Product['category'],
+    displayNumber: p.displayNumber ?? 0,
+    title: { ar: p.titleAr, en: p.titleEn || p.titleAr },
+    description,
     image: p.image,
+    images: gallery.length > 0 ? gallery : p.image ? [p.image] : [],
     materials: { ar: p.materialsAr, en: p.materialsEn || p.materialsAr },
     dimensions: { ar: p.dimensionsAr, en: p.dimensionsEn || p.dimensionsAr },
     featured: p.featured,
@@ -74,6 +87,7 @@ export default function ProductDetailPage({
         : initialProduct?.id
 
   const { lang, t, isSaved, toggleSave } = useApp()
+  const { siteData } = useSiteData()
   const [related, setRelated] = useState<Product[]>([])
 
   // Critical path: server product only — never wait on full site catalog / AI
@@ -117,6 +131,15 @@ export default function ProductDetailPage({
     }
   }, [product?.id])
 
+  const category = getCategoryById(siteData.categories ?? [], product?.categoryId ?? '')
+  const categoryLabel = categoryTitle(category, lang) || product?.category || ''
+  const descriptionText = product?.description?.[lang]?.trim()
+  const galleryImages = useMemo(() => {
+    if (!product) return []
+    const urls = [product.image, ...(product.images ?? [])].filter(Boolean)
+    return [...new Set(urls)]
+  }, [product])
+
   if (!product) {
     if (!initialProduct && id) return <DetailSkeleton />
     return (
@@ -132,38 +155,36 @@ export default function ProductDetailPage({
   return (
     <div className="section-padding">
       <div className="container-main">
-        <Link href="/works" className="btn-ghost group mb-6 inline-flex items-center gap-1.5" prefetch>
+        <Link href={category ? `/categories/${category.slug}` : '/categories'} className="btn-ghost group mb-6 inline-flex items-center gap-1.5" prefetch>
           <DirectionalArrow direction="back" />
-          {t.common.back}
+          {categoryLabel || t.common.back}
         </Link>
 
         <div className="grid gap-8 lg:grid-cols-2">
-          <div className="overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800">
-            <OptimizedImage
-              src={product.image}
-              alt={product.title[lang]}
-              width={960}
-              widths={[480, 720, 960]}
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              priority
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <ProductGallery images={galleryImages} alt={product.title[lang]} />
 
           <div>
             <span className="mb-2 inline-block rounded-lg bg-primary-100 px-3 py-1 text-sm font-medium text-primary-700 dark:bg-primary-900 dark:text-primary-300">
-              {categoryLabels[lang][product.category] ?? product.category}
+              {categoryLabel}
             </span>
+
+            {product.displayNumber > 0 && (
+              <p className="mb-2 text-sm font-semibold text-primary-600 dark:text-primary-400">
+                #{product.displayNumber}
+              </p>
+            )}
 
             <h1 className="mb-4 text-3xl font-bold text-gray-800 dark:text-gray-100 lg:text-4xl">
               {product.title[lang]}
             </h1>
 
-            <p className="mb-6 leading-relaxed text-gray-600 dark:text-gray-400">
-              {product.description[lang]}
-            </p>
+            {descriptionText ? (
+              <p className="mb-6 leading-relaxed text-gray-600 dark:text-gray-400">{descriptionText}</p>
+            ) : null}
 
+            {(product.materials?.[lang]?.trim() || product.dimensions?.[lang]?.trim()) && (
             <div className="mb-6 space-y-3">
+              {product.materials?.[lang]?.trim() ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                   {t.works.materials}:
@@ -172,6 +193,8 @@ export default function ProductDetailPage({
                   {product.materials[lang]}
                 </span>
               </div>
+              ) : null}
+              {product.dimensions?.[lang]?.trim() ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                   {t.works.dimensions}:
@@ -180,12 +203,15 @@ export default function ProductDetailPage({
                   {product.dimensions[lang]}
                 </span>
               </div>
+              ) : null}
             </div>
+            )}
 
+            {(product.colors?.length ?? 0) > 0 && (
             <div className="mb-6 flex items-center gap-2">
               <span className="text-sm text-gray-500 dark:text-gray-400">{t.works.category}:</span>
               <div className="flex gap-1">
-                {product.colors.map((color, i) => (
+                {product.colors!.map((color, i) => (
                   <div
                     key={i}
                     className="h-6 w-6 rounded-full ring-2 ring-white dark:ring-gray-800"
@@ -194,6 +220,7 @@ export default function ProductDetailPage({
                 ))}
               </div>
             </div>
+            )}
 
             <div className="flex flex-wrap gap-3">
               <button

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './db'
 import { createDefaultSiteData, DEFAULT_ADMIN_EMAIL } from '../src/data/defaultSiteData'
 import {
+  categoryFromSiteData,
   configFromSiteData,
   managerFromSiteData,
   productFromSiteData,
@@ -38,11 +39,18 @@ async function main() {
   await ensureSuperAdminSeeded(email, passwordHash)
 
   await prisma.product.deleteMany()
+  await prisma.portfolioCategory.deleteMany()
   await prisma.manager.deleteMany()
+
+  if (defaults.categories.length > 0) {
+    await prisma.portfolioCategory.createMany({
+      data: defaults.categories.map((c, i) => categoryFromSiteData(c, i)),
+    })
+  }
 
   if (defaults.products.length > 0) {
     await prisma.product.createMany({
-      data: defaults.products.map((p, i) => productFromSiteData(p, i)),
+      data: defaults.products.map((p, i) => productFromSiteData(p, i, defaults.categories)),
     })
   }
 

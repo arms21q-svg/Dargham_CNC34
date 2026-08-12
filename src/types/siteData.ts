@@ -1,4 +1,14 @@
-import type { Category, Product } from '../data/content'
+import type { Product } from '../data/content'
+
+export interface PortfolioCategory {
+  id: string
+  slug: string
+  title: { ar: string; en: string }
+  description?: { ar: string; en: string }
+  image: string
+  enabled: boolean
+  sortOrder: number
+}
 
 export interface HomeSettings {
   heroTitle: { ar: string; en: string }
@@ -88,9 +98,11 @@ export interface SiteData {
   home: HomeSettings
   about: AboutSettings
   contact: ContactSettings
+  categories: PortfolioCategory[]
   products: Product[]
   managers: Manager[]
   settings: SiteSettings
 }
 
-export type { Category, Product }
+export type { Product }
+export type { Category } from '../data/content'

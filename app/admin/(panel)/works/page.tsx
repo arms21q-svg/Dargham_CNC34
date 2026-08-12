@@ -1,5 +1,5 @@
-import AdminWorks from '@/views/admin/AdminWorks'
+import { redirect } from 'next/navigation'
 
 export default function Page() {
-  return <AdminWorks />
+  redirect('/admin/categories')
 }

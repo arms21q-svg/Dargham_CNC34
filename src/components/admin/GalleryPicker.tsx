@@ -15,6 +15,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
 
   const gallery = images.length > 0 ? images : primary ? [primary] : []
 
@@ -27,6 +28,14 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
           ? primary
           : clean[0] || ''
     onChange(clean, cover)
+  }
+
+  const reorder = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= gallery.length || to >= gallery.length) return
+    const next = [...gallery]
+    const [item] = next.splice(from, 1)
+    next.splice(to, 0, item)
+    commit(next)
   }
 
   const addFiles = async (files: FileList | null) => {
@@ -62,7 +71,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
 
   return (
     <div className="space-y-3">
-      <label className="form-label">صور العمل</label>
+      <label className="form-label">صور العمل (صورة واحدة أو عدة صور)</label>
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -99,16 +108,24 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
 
       {gallery.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {gallery.map((src) => {
+          {gallery.map((src, index) => {
             const isPrimary = src === primary
             return (
               <div
-                key={src.slice(0, 64)}
-                className={`relative overflow-hidden rounded-xl border ${
+                key={`${index}-${src.slice(0, 48)}`}
+                draggable
+                onDragStart={() => setDragIndex(index)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (dragIndex != null) reorder(dragIndex, index)
+                  setDragIndex(null)
+                }}
+                onDragEnd={() => setDragIndex(null)}
+                className={`relative cursor-grab overflow-hidden rounded-xl border active:cursor-grabbing ${
                   isPrimary
                     ? 'border-primary-500 ring-2 ring-primary-200 dark:ring-primary-800'
                     : 'border-gray-200 dark:border-gray-700'
-                }`}
+                } ${dragIndex === index ? 'opacity-60' : ''}`}
               >
                 <img src={src} alt="" className="aspect-square w-full object-cover" />
                 <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-black/55 p-1.5">
@@ -131,6 +148,9 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
             )
           })}
         </div>
+      )}
+      {gallery.length > 1 && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">اسحب الصور لإعادة ترتيبها</p>
       )}
     </div>
   )

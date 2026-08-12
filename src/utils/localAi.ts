@@ -27,7 +27,7 @@ export function localAiReply(message: string, lang: 'ar' | 'en', siteData: SiteD
   if (/work|product|عمل|خشب|wood|أعمال|cnc|جدار|door|باب/.test(text)) {
     const items = siteData.products.slice(0, 5).map((p) => {
       const title = p.title[lang]
-      const materials = p.materials[lang]
+      const materials = p.materials?.[lang]
       return `• ${title}${materials ? ` (${materials})` : ''}`
     })
 

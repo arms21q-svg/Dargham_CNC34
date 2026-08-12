@@ -166,6 +166,7 @@ export function mergeSiteData(base: SiteData, patch: Partial<SiteData>): SiteDat
     contact: { ...base.contact, ...patch.contact },
     settings: { ...base.settings, ...patch.settings },
     products: patch.products ?? base.products,
+    categories: patch.categories ?? base.categories,
     managers: patch.managers ?? base.managers,
   }
 }

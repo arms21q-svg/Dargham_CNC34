@@ -52,7 +52,8 @@ const nextConfig: NextConfig = {
       { source: '/about', destination: '/', permanent: true },
       { source: '/faq', destination: '/', permanent: true },
       { source: '/works/all', destination: '/works', permanent: true },
-      { source: '/admin/contact', destination: '/admin/social', permanent: false },
+      { source: '/admin/works', destination: '/admin/categories', permanent: false },
+      { source: '/portfolio/:slug', destination: '/categories/:slug', permanent: true },
       { source: '/admin/managers', destination: '/admin', permanent: false },
       { source: '/admin/employees', destination: '/admin/account', permanent: false },
     ]

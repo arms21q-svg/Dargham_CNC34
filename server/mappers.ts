@@ -1,4 +1,4 @@
-import type { Manager as DbManager, PortfolioCategory as DbCategory, Product as DbProduct, SiteConfig } from '@prisma/client'
+import type { Manager as DbManager, PortfolioCategory as DbCategory, SiteConfig } from '@prisma/client'
 import { createDefaultAboutSettings } from '../src/data/defaultSiteData'
 import { createDefaultCategories } from '../src/data/defaultCategories'
 import type { AboutSettings, FloatLink, PortfolioCategory, SiteData } from '../src/types/siteData'
@@ -71,27 +71,26 @@ function parseFloatLinks(raw: unknown, config: SiteConfig): FloatLink[] {
   ]
 }
 /** Fields required to map DB rows to public SiteData products (vectors/hashes optional). */
-export type ProductMapperInput = Pick<
-  DbProduct,
-  | 'id'
-  | 'titleAr'
-  | 'titleEn'
-  | 'descriptionAr'
-  | 'descriptionEn'
-  | 'category'
-  | 'categoryId'
-  | 'displayNumber'
-  | 'image'
-  | 'images'
-  | 'materialsAr'
-  | 'materialsEn'
-  | 'dimensionsAr'
-  | 'dimensionsEn'
-  | 'featured'
-  | 'published'
-  | 'colors'
-  | 'sortOrder'
->
+export type ProductMapperInput = {
+  id: string
+  titleAr: string
+  titleEn: string
+  category: string
+  categoryId?: string | null
+  displayNumber?: number
+  image: string
+  images?: string[]
+  descriptionAr?: string
+  descriptionEn?: string
+  materialsAr?: string
+  materialsEn?: string
+  dimensionsAr?: string
+  dimensionsEn?: string
+  featured?: boolean
+  published?: boolean
+  colors?: string[]
+  sortOrder?: number
+}
 
 export function toSiteData(
   config: SiteConfig,
@@ -140,15 +139,13 @@ export function toSiteData(
     },
     categories: categoryRows,
     products: products.map((p) => {
-      const images =
-        Array.isArray(p.images) && p.images.length > 0
-          ? p.images.filter(Boolean)
-          : p.image
-            ? [p.image]
-            : []
+      const gallery = Array.isArray(p.images) ? p.images.filter(Boolean) : []
+      const images = gallery.length > 0 ? gallery : p.image ? [p.image] : []
+      const descriptionAr = p.descriptionAr?.trim() ?? ''
+      const descriptionEn = p.descriptionEn?.trim() ?? ''
       const description =
-        p.descriptionAr.trim() || p.descriptionEn.trim()
-          ? { ar: p.descriptionAr, en: p.descriptionEn }
+        descriptionAr || descriptionEn
+          ? { ar: descriptionAr, en: descriptionEn }
           : undefined
       return {
         id: p.id,
@@ -159,11 +156,11 @@ export function toSiteData(
         description,
         image: p.image || images[0] || '',
         images,
-        materials: { ar: p.materialsAr, en: p.materialsEn },
-        dimensions: { ar: p.dimensionsAr, en: p.dimensionsEn },
-        featured: p.featured,
+        materials: { ar: p.materialsAr ?? '', en: p.materialsEn ?? '' },
+        dimensions: { ar: p.dimensionsAr ?? '', en: p.dimensionsEn ?? '' },
+        featured: p.featured ?? false,
         published: p.published !== false,
-        colors: p.colors,
+        colors: p.colors ?? [],
       }
     }),
     managers: managers.map((m) => ({

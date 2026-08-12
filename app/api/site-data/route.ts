@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
-import { getCachedSiteData, fetchSiteDataFresh } from '@server/cachedSiteData'
+import { fetchSiteDataFresh, getCachedPublicCatalogData, getCachedSiteData } from '@server/cachedSiteData'
 import { lightPublicSiteData } from '@server/lightSiteData'
 import { scheduleProductImageReindex, ensureProductImageIndex } from '@server/imageIndex'
 import { syncSiteDataToDb } from '@server/syncSiteData'
@@ -33,8 +33,9 @@ function sanitizeAdminSiteData(data: SiteData): SiteData {
   }
 }
 
-async function fetchSiteData(fresh = false) {
-  return fresh ? fetchSiteDataFresh() : getCachedSiteData()
+async function fetchSiteData(fresh = false, publicOnly = false) {
+  if (fresh) return fetchSiteDataFresh()
+  return publicOnly ? getCachedPublicCatalogData() : getCachedSiteData()
 }
 
 async function parseBody(req: NextRequest): Promise<SiteData> {
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
   try {
     const isAdmin = Boolean(verifyBearerHeader(req.headers.get('authorization')))
     const fresh = req.nextUrl.searchParams.get('fresh') === '1'
-    const data = await fetchSiteData(fresh)
+    const data = await fetchSiteData(fresh, !isAdmin)
 
     if (!data) {
       return NextResponse.json(

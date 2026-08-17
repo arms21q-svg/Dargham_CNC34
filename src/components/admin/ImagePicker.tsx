@@ -9,17 +9,18 @@ interface ImagePickerProps {
   label?: string
 }
 
-/** Admin image picker — upload from device only (no URL input). */
+/** Admin image picker — any aspect ratio; auto-compress for performance. */
 export default function ImagePicker({ value, onChange, label = 'الصورة' }: ImagePickerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [preserveOriginal, setPreserveOriginal] = useState(false)
 
   const handleFile = async (file: File) => {
     setLoading(true)
     setError('')
     try {
-      const dataUrl = await fileToDataUrl(file)
+      const dataUrl = await fileToDataUrl(file, { maxSide: 1200, quality: 0.78, preserveOriginal })
       onChange(dataUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر رفع الصورة')
@@ -65,8 +66,19 @@ export default function ImagePicker({ value, onChange, label = 'الصورة' }:
         <span className="text-sm text-gray-500 dark:text-gray-400">
           {loading ? 'جاري رفع الصورة...' : 'اضغط لاختيار صورة من جهازك'}
         </span>
-        <span className="text-xs text-gray-400">JPG, PNG, WEBP — تُضغط تلقائياً قبل الحفظ</span>
+        <span className="text-xs text-gray-400">
+          أي مقاس — عمودي، أفقي، أو مربع · JPG, PNG, WebP
+        </span>
       </button>
+
+      <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+        <input
+          type="checkbox"
+          checked={preserveOriginal}
+          onChange={(e) => setPreserveOriginal(e.target.checked)}
+        />
+        حفظ الصورة الأصلية بدون ضغط (للملفات حتى 2 ميجابايت)
+      </label>
 
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
@@ -82,11 +94,13 @@ export default function ImagePicker({ value, onChange, label = 'الصورة' }:
               حذف الصورة
             </button>
           </div>
-          <img
-            src={value}
-            alt="معاينة"
-            className="h-40 w-full rounded-xl object-cover ring-1 ring-gray-200 dark:ring-gray-700"
-          />
+          <div className="flex h-48 items-center justify-center overflow-hidden rounded-xl bg-gray-100 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
+            <img
+              src={value}
+              alt="معاينة"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
         </div>
       )}
     </div>

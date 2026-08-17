@@ -11,6 +11,8 @@ import { categoryTitle, getCategoryById } from '../utils/categories'
 import { useSiteData } from '../context/SiteDataContext'
 import { downloadImage } from '../utils/imageSearch'
 import { apiUrl } from '../utils/apiBase'
+import { formatAttachmentType } from '../utils/fileAttachment'
+import { formatFileSize } from '../utils/imageFile'
 import { useApp } from '../context/AppContext'
 
 type InitialProduct = {
@@ -30,6 +32,9 @@ type InitialProduct = {
   displayNumber?: number
   featured: boolean
   colors: string[]
+  attachmentName?: string
+  attachmentMime?: string
+  attachmentSize?: number
 }
 
 function toProduct(p: InitialProduct): Product {
@@ -38,6 +43,14 @@ function toProduct(p: InitialProduct): Product {
       ? { ar: p.descriptionAr, en: p.descriptionEn || p.descriptionAr }
       : undefined
   const gallery = (p.images ?? []).filter(Boolean)
+  const attachment = p.attachmentName?.trim()
+    ? {
+        name: p.attachmentName,
+        mime: p.attachmentMime ?? '',
+        size: p.attachmentSize ?? 0,
+        data: `/api/products/${encodeURIComponent(p.id)}/attachment`,
+      }
+    : undefined
   return {
     id: p.id,
     categoryId: p.categoryId ?? '',
@@ -51,6 +64,7 @@ function toProduct(p: InitialProduct): Product {
     dimensions: { ar: p.dimensionsAr, en: p.dimensionsEn || p.dimensionsAr },
     featured: p.featured,
     colors: p.colors?.length ? p.colors : ['#8B7355'],
+    attachment,
   }
 }
 
@@ -259,6 +273,32 @@ export default function ProductDetailPage({
                 </svg>
                 {t.works.download}
               </button>
+
+              {product.attachment?.name?.trim() && (
+                <a
+                  href={apiUrl(
+                    product.attachment.data?.startsWith('/api/')
+                      ? product.attachment.data
+                      : `/api/products/${encodeURIComponent(product.id)}/attachment`
+                  )}
+                  download={product.attachment.name}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  {lang === 'ar' ? 'تحميل الملف' : 'Download file'}
+                  <span className="text-xs opacity-75">
+                    ({formatAttachmentType(product.attachment.mime, product.attachment.name)} ·{' '}
+                    {formatFileSize(product.attachment.size)})
+                  </span>
+                </a>
+              )}
 
               <Link href="/contact" className="btn-primary" prefetch>
                 {t.home.contactUs}

@@ -294,6 +294,16 @@ export interface Product {
   /** Visible on public site when true */
   published?: boolean
   colors?: string[]
+  /** Optional PDF / design file / catalog */
+  attachment?: ProductAttachmentMeta
+}
+
+export type ProductAttachmentMeta = {
+  name: string
+  mime: string
+  size: number
+  /** data URL (admin) or /api/products/{id}/attachment (public) */
+  data?: string
 }
 
 /** Legacy seed rows — migrated to categoryId + displayNumber in defaultSiteData */

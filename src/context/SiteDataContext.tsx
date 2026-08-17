@@ -26,6 +26,7 @@ import {
   loadSiteDataFresh,
   loginWithApi,
   mergePublishPayload,
+  mergePublishWithServerCatalog,
   publishSiteData,
   purgeStaleClientCache,
   saveSiteDataLocal,
@@ -153,22 +154,26 @@ export function SiteDataProvider({
       saveSiteDataLocal(data)
     }
 
+    if (boot) {
+      applyFresh(boot)
+      setLoading(false)
+    }
+
     const refreshFromApi = () => {
-      loadSiteData()
+      loadSiteDataFresh()
         .then(applyFresh)
         .catch(() => {
           /* keep bootstrap */
         })
     }
 
-    // Public: show SSR bootstrap immediately, then refresh catalog in background (SWR).
+    // Public: show SSR bootstrap immediately, then refresh catalog from DB.
     if (boot && !token) {
-      setLoading(false)
       const idle =
         typeof window.requestIdleCallback === 'function'
-          ? window.requestIdleCallback(refreshFromApi, { timeout: 2500 })
+          ? window.requestIdleCallback(refreshFromApi, { timeout: 1200 })
           : null
-      const timer = window.setTimeout(refreshFromApi, idle == null ? 1800 : 8000)
+      const timer = window.setTimeout(refreshFromApi, idle == null ? 800 : 3000)
       const onFocus = () => refreshFromApi()
       window.addEventListener('focus', onFocus)
       return () => {
@@ -181,21 +186,38 @@ export function SiteDataProvider({
       }
     }
 
-    loadSiteData()
-      .then((data) => {
-        applyFresh(data)
-      })
-      .catch(() => {
-        /* keep local/defaults */
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    if (!boot) {
+      loadSiteData()
+        .then((data) => {
+          applyFresh(data)
+        })
+        .catch(() => {
+          /* keep local/defaults */
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }
 
     return () => {
       cancelled = true
     }
   }, [initialSiteData])
+
+  useEffect(() => {
+    const onPublished = () => {
+      void loadSiteDataFresh()
+        .then((data) => {
+          setSiteData((prev) => (shouldApplyIncomingSiteData(data, prev) ? data : prev))
+          saveSiteDataLocal(data)
+        })
+        .catch(() => {
+          /* keep current */
+        })
+    }
+    window.addEventListener('dorgham-catalog-published', onPublished)
+    return () => window.removeEventListener('dorgham-catalog-published', onPublished)
+  }, [])
 
   useEffect(() => {
     if (!authReady || !isAdmin) return
@@ -412,7 +434,7 @@ export function SiteDataProvider({
     let payload = override ?? siteData
     if (getAuthToken()) {
       const fresh = await loadSiteDataFresh()
-      payload = mergePublishPayload(payload, fresh)
+      payload = mergePublishWithServerCatalog(mergePublishPayload(payload, fresh), fresh)
     }
     const result = await publishSiteData(payload)
     if (result.ok) {

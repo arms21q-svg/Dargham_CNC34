@@ -1,58 +1,131 @@
-const MAX_FILE_SIZE = 6 * 1024 * 1024
-/** Keep embedded images small enough for fast admin publish. */
-const MAX_DATA_URL_CHARS = 700_000
+/** Max input file size before compression (any aspect ratio accepted). */
+export const MAX_IMAGE_FILE_SIZE = 12 * 1024 * 1024
+/** Target max chars for embedded data URLs in publish payloads. */
+export const MAX_DATA_URL_CHARS = 700_000
+/** Skip recompression when admin opts in and file is under this size. */
+export const PRESERVE_ORIGINAL_MAX = 2 * 1024 * 1024
 
-export async function fileToDataUrl(
-  file: File,
-  maxWidth = 900,
-  quality = 0.72
-): Promise<string> {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('يرجى اختيار ملف صورة')
-  }
+export type ImageUploadOptions = {
+  /** Longest side in pixels after resize (default 1200). */
+  maxSide?: number
+  /** JPEG/WebP quality 0–1 (default 0.78). */
+  quality?: number
+  /** Store original file without resize when under PRESERVE_ORIGINAL_MAX. */
+  preserveOriginal?: boolean
+}
 
-  if (file.size > MAX_FILE_SIZE) {
-    throw new Error('حجم الصورة كبير جداً. الحد الأقصى 6 ميجابايت')
-  }
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, maxWidth / bitmap.width)
-  const width = Math.round(bitmap.width * scale)
-  const height = Math.round(bitmap.height * scale)
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result === 'string') resolve(result)
+      else reject(new Error('تعذر قراءة الصورة'))
+    }
+    reader.onerror = () => reject(new Error('تعذر قراءة الصورة'))
+    reader.readAsDataURL(file)
+  })
+}
 
+function drawScaled(
+  source: CanvasImageSource,
+  srcW: number,
+  srcH: number,
+  maxSide: number
+): HTMLCanvasElement {
+  const scale = Math.min(1, maxSide / Math.max(srcW, srcH))
+  const width = Math.max(1, Math.round(srcW * scale))
+  const height = Math.max(1, Math.round(srcH * scale))
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
-
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('تعذر معالجة الصورة')
+  ctx.drawImage(source, 0, 0, width, height)
+  return canvas
+}
 
-  ctx.drawImage(bitmap, 0, 0, width, height)
-  bitmap.close()
-
-  // Prefer JPEG for smaller publish payloads (PNG stays for transparency).
-  const preferPng = file.type === 'image/png'
-  let dataUrl = preferPng
+function encodeCanvas(
+  canvas: HTMLCanvasElement,
+  preferPng: boolean,
+  quality: number
+): string {
+  return preferPng
     ? canvas.toDataURL('image/png')
     : canvas.toDataURL('image/jpeg', quality)
+}
 
-  if (dataUrl.length > MAX_DATA_URL_CHARS) {
-    dataUrl = canvas.toDataURL('image/jpeg', Math.min(quality, 0.62))
+/**
+ * Accept any image dimensions/aspect ratio — portrait, landscape, or square.
+ * Scales down the longest side for performance; never crops or distorts.
+ */
+export async function fileToDataUrl(
+  file: File,
+  maxSideOrOptions: number | ImageUploadOptions = 1200,
+  legacyQuality = 0.78
+): Promise<string> {
+  const options: ImageUploadOptions =
+    typeof maxSideOrOptions === 'number'
+      ? { maxSide: maxSideOrOptions, quality: legacyQuality }
+      : maxSideOrOptions
+
+  const maxSide = options.maxSide ?? 1200
+  const quality = options.quality ?? 0.78
+  const preserveOriginal = options.preserveOriginal ?? false
+
+  if (!file.type.startsWith('image/')) {
+    throw new Error('يرجى اختيار ملف صورة (JPG, PNG, WebP, GIF…)')
+  }
+
+  if (file.size > MAX_IMAGE_FILE_SIZE) {
+    throw new Error(
+      `حجم الصورة كبير جداً (${formatFileSize(file.size)}). الحد الأقصى ${formatFileSize(MAX_IMAGE_FILE_SIZE)}`
+    )
+  }
+
+  if (preserveOriginal && file.size <= PRESERVE_ORIGINAL_MAX) {
+    const raw = await readFileAsDataUrl(file)
+    if (raw.length > MAX_DATA_URL_CHARS) {
+      throw new Error(
+        'الصورة الأصلية كبيرة للتخزين. أزل «حفظ الأصل» أو استخدم صورة أصغر'
+      )
+    }
+    return raw
+  }
+
+  const bitmap = await createImageBitmap(file)
+  const srcW = bitmap.width
+  const srcH = bitmap.height
+
+  let canvas = drawScaled(bitmap, srcW, srcH, maxSide)
+  bitmap.close()
+
+  const preferPng = file.type === 'image/png' || file.type === 'image/webp'
+  let dataUrl = encodeCanvas(canvas, preferPng, quality)
+
+  const steps: Array<{ side: number; quality: number; forceJpeg: boolean }> = [
+    { side: maxSide, quality: Math.min(quality, 0.68), forceJpeg: true },
+    { side: 960, quality: 0.62, forceJpeg: true },
+    { side: 720, quality: 0.55, forceJpeg: true },
+  ]
+
+  for (const step of steps) {
+    if (dataUrl.length <= MAX_DATA_URL_CHARS) break
+    canvas = drawScaled(canvas, canvas.width, canvas.height, step.side)
+    dataUrl = encodeCanvas(canvas, preferPng && !step.forceJpeg, step.quality)
   }
 
   if (dataUrl.length > MAX_DATA_URL_CHARS) {
-    const smaller = document.createElement('canvas')
-    const ratio = 720 / width
-    smaller.width = Math.round(width * Math.min(1, ratio))
-    smaller.height = Math.round(height * Math.min(1, ratio))
-    const sctx = smaller.getContext('2d')
-    if (!sctx) throw new Error('تعذر معالجة الصورة')
-    sctx.drawImage(canvas, 0, 0, smaller.width, smaller.height)
-    dataUrl = smaller.toDataURL('image/jpeg', 0.58)
-  }
-
-  if (dataUrl.length > MAX_DATA_URL_CHARS) {
-    throw new Error('الصورة كبيرة بعد الضغط. جرّب صورة أصغر أو أقل دقة')
+    throw new Error(
+      'الصورة كبيرة بعد الضغط. جرّب صورة أقل دقة أو فعّل «حفظ الأصل» لملف صغير'
+    )
   }
 
   return dataUrl

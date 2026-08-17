@@ -50,14 +50,14 @@ function ProductCard({
           prefetch={false}
           className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414] text-center shadow-sm md:hidden"
         >
-          <div className="relative aspect-square w-full overflow-hidden bg-black/40">
+          <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-black/40">
             <ProductPhoto
               src={imageSrc}
               alt={product.title[lang]}
               width={400}
               widths={[240, 320, 400]}
               sizes="50vw"
-              className="h-full w-full object-cover transition-transform duration-300 group-active:scale-[1.02]"
+              className="max-h-full max-w-full object-contain transition-transform duration-300 group-active:scale-[1.02]"
             />
             {product.displayNumber > 0 && (
               <span className="absolute end-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">
@@ -83,14 +83,14 @@ function ProductCard({
         {/* Tablet / desktop: existing card */}
         <div className="card-hover group hidden overflow-hidden content-visibility-auto md:block">
           <Link href={`/works/${product.id}`} prefetch={false} className="block">
-            <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
+            <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gray-100 dark:bg-gray-800">
               <ProductPhoto
                 src={imageSrc}
                 alt={product.title[lang]}
                 width={480}
                 widths={[320, 400, 480]}
                 sizes="(max-width: 1024px) 50vw, 25vw"
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
               />
               {typeof similarityScore === 'number' && (
                 <span className="absolute start-3 top-3 z-10 rounded-full bg-black/75 px-2.5 py-1 text-xs font-bold text-white shadow-lg backdrop-blur-sm">
@@ -158,14 +158,14 @@ function ProductCard({
   return (
     <div className="card-hover group overflow-hidden content-visibility-auto">
       <Link href={`/works/${product.id}`} prefetch={false} className="block">
-        <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gray-100 dark:bg-gray-800">
           <ProductPhoto
             src={imageSrc}
             alt={product.title[lang]}
             width={480}
             widths={[240, 320, 400, 480]}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
           />
           {typeof similarityScore === 'number' && (
             <span className="absolute start-3 top-3 z-10 rounded-full bg-black/75 px-2.5 py-1 text-xs font-bold text-white shadow-lg backdrop-blur-sm">

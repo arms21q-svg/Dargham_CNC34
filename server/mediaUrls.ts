@@ -18,6 +18,10 @@ export function categoryImageUrl(categoryId: string): string {
   return `/api/categories/${encodeURIComponent(categoryId)}/image`
 }
 
+export function productAttachmentUrl(productId: string): string {
+  return `/api/products/${encodeURIComponent(productId)}/attachment`
+}
+
 /** Replace embedded base64 with lightweight proxy URLs for public pages. */
 export function toPublicMediaUrl(
   ownerId: string,
@@ -43,6 +47,10 @@ export function isProxyMediaUrl(url: string | undefined): boolean {
     url.startsWith('/api/site/slides/') ||
     url.startsWith('/api/categories/')
   )
+}
+
+export function isAttachmentProxyUrl(url: string | undefined): boolean {
+  return Boolean(url?.includes('/attachment'))
 }
 
 export function isServeableMediaUrl(url: string | undefined): boolean {

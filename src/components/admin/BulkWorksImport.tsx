@@ -82,7 +82,7 @@ export default function BulkWorksImport({
             continue
           }
 
-          const image = await fileToDataUrl(file, 900, 0.72)
+          const image = await fileToDataUrl(file, { maxSide: 1200, quality: 0.78 })
           if (existingFingerprints.has(image.slice(0, 120))) {
             skipped++
             setProgress({ done: i + 1, total: list.length })
@@ -230,7 +230,7 @@ export default function BulkWorksImport({
               key={draft.id}
               className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:flex-row sm:items-start"
             >
-              <img src={draft.image} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
+              <img src={draft.image} alt="" className="h-20 w-20 shrink-0 rounded-lg object-contain bg-gray-100 dark:bg-gray-800" />
               <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className="form-label text-xs">رقم العمل</label>

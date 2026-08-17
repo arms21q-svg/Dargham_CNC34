@@ -74,7 +74,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
           }
           seen.add(fp)
 
-          const dataUrl = await fileToDataUrl(file, 900, 0.72)
+          const dataUrl = await fileToDataUrl(file, { maxSide: 1200, quality: 0.78 })
           if (existing.has(dataUrl)) {
             skipped++
             setProgress({ done: i + 1, total: list.length })
@@ -157,7 +157,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
                     : 'border-gray-200 dark:border-gray-700'
                 } ${dragIndex === index ? 'opacity-60' : ''}`}
               >
-                <img src={src} alt="" className="aspect-square w-full object-cover" loading="lazy" />
+                <img src={src} alt="" className="aspect-square w-full object-contain bg-gray-100 dark:bg-gray-900" loading="lazy" />
                 <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-black/55 p-1.5">
                   <button
                     type="button"

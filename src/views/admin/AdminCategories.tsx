@@ -7,6 +7,7 @@ import AdminSaveBar from '../../components/admin/AdminSaveBar'
 import BulkWorksImport from '../../components/admin/BulkWorksImport'
 import ImagePicker from '../../components/admin/ImagePicker'
 import GalleryPicker from '../../components/admin/GalleryPicker'
+import ProductAttachmentPicker from '../../components/admin/ProductAttachmentPicker'
 import { nextDisplayNumber, productsInCategory, validateProductDisplayNumber } from '../../utils/categories'
 import { slugify, uniqueSlug } from '../../utils/slug'
 
@@ -58,6 +59,7 @@ export default function AdminCategories() {
   const [autoPublishOnSave, setAutoPublishOnSave] = useState(true)
   const [savingWork, setSavingWork] = useState(false)
   const [autoPublishMessage, setAutoPublishMessage] = useState('')
+  const [autoPublishOk, setAutoPublishOk] = useState(true)
   const [workSearch, setWorkSearch] = useState('')
   const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set())
 
@@ -216,6 +218,7 @@ export default function AdminCategories() {
         workForm.description?.ar?.trim() || workForm.description?.en?.trim()
           ? workForm.description
           : undefined,
+      attachment: workForm.attachment?.name?.trim() ? workForm.attachment : undefined,
     }
 
     const nextSiteData: SiteData = {
@@ -236,6 +239,7 @@ export default function AdminCategories() {
       setAutoPublishMessage('')
       const result = await publish(nextSiteData)
       setSavingWork(false)
+      setAutoPublishOk(result.ok)
       setAutoPublishMessage(result.ok ? '✓ تم حفظ العمل ونشره على الموقع' : `✗ ${result.message}`)
       setTimeout(() => setAutoPublishMessage(''), 6000)
     }
@@ -256,6 +260,7 @@ export default function AdminCategories() {
       setAutoPublishMessage('')
       const result = await publish(nextSiteData)
       setSavingWork(false)
+      setAutoPublishOk(result.ok)
       setAutoPublishMessage(
         result.ok ? `✓ تم إضافة ${items.length} عمل ونشرها على الموقع` : `✗ ${result.message}`
       )
@@ -299,9 +304,11 @@ export default function AdminCategories() {
       setAutoPublishMessage('')
       const result = await publish(nextSiteData)
       setSavingWork(false)
+      setAutoPublishOk(result.ok)
       setAutoPublishMessage(result.ok ? `✓ ${successMsg}` : `✗ ${result.message}`)
       setTimeout(() => setAutoPublishMessage(''), 6000)
     } else {
+      setAutoPublishOk(true)
       setAutoPublishMessage(`✓ ${successMsg} — اضغط «نشر على الموقع»`)
       setTimeout(() => setAutoPublishMessage(''), 6000)
     }
@@ -635,6 +642,12 @@ export default function AdminCategories() {
                         }
                       />
                     </div>
+                    <div className="sm:col-span-2">
+                      <ProductAttachmentPicker
+                        value={workForm.attachment}
+                        onChange={(attachment) => setWorkForm({ ...workForm, attachment })}
+                      />
+                    </div>
                     <div className="flex items-center gap-2 sm:col-span-2">
                       <input
                         id="work-published"
@@ -755,7 +768,15 @@ export default function AdminCategories() {
           نشر تلقائي على الموقع بعد حفظ الأعمال (موصى به)
         </label>
         {autoPublishMessage && (
-          <p className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">{autoPublishMessage}</p>
+          <p
+            className={`mt-2 text-sm font-medium ${
+              autoPublishOk
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-red-600 dark:text-red-400'
+            }`}
+          >
+            {autoPublishMessage}
+          </p>
         )}
       </div>
 

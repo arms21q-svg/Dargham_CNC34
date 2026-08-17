@@ -1,4 +1,4 @@
-import type { SiteData } from '../types/siteData'
+import type { SiteData, Product } from '../types/siteData'
 import {
   createDefaultSiteData,
   DEFAULT_ADMIN_EMAIL,
@@ -192,6 +192,24 @@ function isProxySlideImage(url: string | undefined): boolean {
   return Boolean(url?.startsWith('/api/site/slides/'))
 }
 
+function isProxyAttachment(url: string | undefined): boolean {
+  return Boolean(url?.includes('/attachment'))
+}
+
+function mergeAttachment(local: Product, db: Product): Product['attachment'] {
+  const localAtt = local.attachment
+  if (!localAtt?.name?.trim()) return undefined
+
+  const localData = localAtt.data?.trim() ?? ''
+  const dbData = db.attachment?.data?.trim() ?? ''
+
+  if ((!localData || isProxyAttachment(localData)) && dbData && !isProxyAttachment(dbData)) {
+    return { ...localAtt, data: dbData }
+  }
+
+  return localAtt
+}
+
 /** Restore DB media when the admin UI still holds public proxy URLs from bootstrap. */
 export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData {
   const storedById = new Map(stored.products.map((p) => [p.id, p]))
@@ -225,7 +243,7 @@ export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData
       })
     }
 
-    return { ...p, image, images }
+    return { ...p, image, images, attachment: mergeAttachment(p, db) }
   })
 
   const slideImages = (local.home?.slideImages ?? []).map((url, index) => {
@@ -241,6 +259,26 @@ export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData
     ...local,
     products,
     home: { ...local.home, slideImages },
+  }
+}
+
+/**
+ * Keep server-only catalog rows when the admin client has a partial product list
+ * (e.g. stale localStorage) so publish does not delete existing works.
+ */
+export function mergePublishWithServerCatalog(local: SiteData, stored: SiteData): SiteData {
+  const localProductIds = new Set((local.products ?? []).map((p) => p.id))
+  const localCategoryIds = new Set((local.categories ?? []).map((c) => c.id))
+
+  const extraProducts = (stored.products ?? []).filter((p) => !localProductIds.has(p.id))
+  const extraCategories = (stored.categories ?? []).filter((c) => !localCategoryIds.has(c.id))
+
+  if (extraProducts.length === 0 && extraCategories.length === 0) return local
+
+  return {
+    ...local,
+    products: [...(local.products ?? []), ...extraProducts],
+    categories: [...(local.categories ?? []), ...extraCategories],
   }
 }
 
@@ -279,9 +317,9 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
 
 async function loadFromApi(defaults: SiteData, fresh = false): Promise<SiteData | null> {
   const token = getAuthToken()
-  const qs = fresh ? '?fresh=1' : ''
+  const qs = fresh ? `?fresh=1&_=${Date.now()}` : `?_=${Date.now()}`
   const res = await fetchWithTimeout(apiUrl(`/api/site-data${qs}`), {
-    cache: token || fresh ? 'no-store' : 'default',
+    cache: 'no-store',
     headers: {
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

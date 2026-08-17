@@ -19,14 +19,14 @@ export default function WorksSearchResultCard({ product, score }: WorksSearchRes
   return (
     <article className="overflow-hidden rounded-2xl border border-[#c9a227]/25 bg-[#141414] text-white shadow-sm md:border-gray-200 md:bg-white md:text-gray-900 dark:md:border-gray-800 dark:md:bg-gray-900 dark:md:text-gray-100">
       <Link href={`/works/${product.id}`} prefetch className="block">
-        <div className="relative aspect-[4/3] overflow-hidden bg-black/40">
+        <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-black/40">
           <OptimizedImage
             src={imageSrc}
             alt={product.title[lang]}
             width={640}
             widths={[320, 480, 640]}
             sizes="(max-width: 768px) 100vw, 33vw"
-            className="h-full w-full object-cover"
+            className="max-h-full max-w-full object-contain"
           />
           {typeof score === 'number' && (
             <span className="absolute start-3 top-3 rounded-full bg-[#c9a227] px-2.5 py-1 text-xs font-bold text-black shadow">

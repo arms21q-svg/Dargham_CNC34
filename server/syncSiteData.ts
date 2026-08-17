@@ -137,6 +137,10 @@ function productContentEqual(
     published: boolean
     colors: string[]
     sortOrder: number
+    attachmentData: string
+    attachmentName: string
+    attachmentMime: string
+    attachmentSize: number
   },
   next: ProductRow
 ): boolean {
@@ -157,7 +161,11 @@ function productContentEqual(
     prev.featured === next.featured &&
     prev.published === next.published &&
     sameStringArray(prev.colors, next.colors) &&
-    prev.sortOrder === next.sortOrder
+    prev.sortOrder === next.sortOrder &&
+    prev.attachmentData === next.attachmentData &&
+    prev.attachmentName === next.attachmentName &&
+    prev.attachmentMime === next.attachmentMime &&
+    prev.attachmentSize === next.attachmentSize
   )
 }
 
@@ -201,7 +209,7 @@ export async function syncSiteDataToDb(
 ): Promise<SyncSiteDataResult> {
   const categories = (body.categories ?? []).map((c, i) => categoryFromSiteData(c, i))
   const uniqueProducts = dedupeById(body.products)
-  const products = uniqueProducts.map((p, i) =>
+  let products = uniqueProducts.map((p, i) =>
     productFromSiteData(p, i, body.categories ?? [])
   )
   const managers = dedupeById(body.managers).map((m, i) => managerFromSiteData(m, i))
@@ -232,6 +240,10 @@ export async function syncSiteDataToDb(
         published: true,
         colors: true,
         sortOrder: true,
+        attachmentData: true,
+        attachmentName: true,
+        attachmentMime: true,
+        attachmentSize: true,
       },
     }),
     prisma.manager.findMany({
@@ -261,6 +273,30 @@ export async function syncSiteDataToDb(
     }),
   ])
 
+  const slugToDbCategoryId = new Map(existingCategories.map((c) => [c.slug, c.id]))
+  const categoryIdRemap = new Map<string, string>()
+
+  for (const c of categories) {
+    const dbId = slugToDbCategoryId.get(c.slug)
+    if (dbId && dbId !== c.id) categoryIdRemap.set(c.id, dbId)
+  }
+
+  const normalizedCategories = categories.flatMap((c) => {
+    const dbId = slugToDbCategoryId.get(c.slug)
+    if (dbId && dbId !== c.id) return []
+    return [c]
+  })
+
+  products = products.map((p) => {
+    let categoryId = p.categoryId ?? null
+    if (categoryId && categoryIdRemap.has(categoryId)) {
+      categoryId = categoryIdRemap.get(categoryId)!
+    } else if (!categoryId) {
+      categoryId = slugToDbCategoryId.get(p.category) ?? null
+    }
+    return categoryId === (p.categoryId ?? null) ? p : { ...p, categoryId }
+  })
+
   const configData = configFromSiteData(body, passwordHash)
   if (existingConfig?.slideImages?.length) {
     configData.slideImages = preserveStoredGallery(
@@ -274,7 +310,7 @@ export async function syncSiteDataToDb(
   const prevCategoryById = new Map(existingCategories.map((c) => [c.id, c]))
   const nextProductIds = new Set(products.map((p) => p.id))
   const nextManagerIds = new Set(managers.map((m) => m.id))
-  const nextCategoryIds = new Set(categories.map((c) => c.id))
+  const nextCategoryIds = new Set(normalizedCategories.map((c) => c.id))
 
   const categoryIdsToDelete = existingCategories
     .filter((c) => !nextCategoryIds.has(c.id))
@@ -289,7 +325,7 @@ export async function syncSiteDataToDb(
   const categoriesToCreate: CategoryRow[] = []
   const categoriesToUpdate: CategoryRow[] = []
 
-  for (const c of categories) {
+  for (const c of normalizedCategories) {
     const prev = prevCategoryById.get(c.id)
     const row = prev ? applyStoredCategoryMedia(c, prev) : c
     if (!prev) {
@@ -360,8 +396,17 @@ export async function syncSiteDataToDb(
         )
       }
       if (productsToCreate.length > 0) {
-        await createManyInBatches(dedupeById(productsToCreate), WRITE_BATCH_SIZE, (chunk) =>
-          tx.product.createMany({ data: chunk, skipDuplicates: true })
+        await runInBatches(dedupeById(productsToCreate), WRITE_BATCH_SIZE, (p) =>
+          tx.product.upsert({
+            where: { id: p.id },
+            create: p,
+            update: {
+              ...p,
+              imageHash: null,
+              imageVector: Prisma.DbNull,
+              indexedAt: null,
+            },
+          })
         )
       }
       if (managersToCreate.length > 0) {

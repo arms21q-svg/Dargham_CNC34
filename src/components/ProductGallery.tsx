@@ -8,6 +8,10 @@ interface ProductGalleryProps {
   alt: string
 }
 
+const frameClass =
+  'flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-gray-100 dark:bg-gray-800'
+const imageClass = 'max-h-full max-w-full object-contain'
+
 export default function ProductGallery({ images, alt }: ProductGalleryProps) {
   const slides = useMemo(() => images.filter(Boolean), [images])
   const slidesKey = slides.join('|')
@@ -38,25 +42,25 @@ export default function ProductGallery({ images, alt }: ProductGalleryProps) {
 
   if (slides.length === 0) {
     return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-gray-800">
-        —
-      </div>
+      <div className={`${frameClass} rounded-2xl text-gray-400`}>—</div>
     )
   }
 
   if (slides.length === 1) {
     return (
-      <div className="overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800">
+      <div className="overflow-hidden rounded-2xl">
         <button type="button" className="block w-full" onClick={() => setLightbox(true)}>
-          <OptimizedImage
-            src={slides[0]}
-            alt={alt}
-            width={960}
-            widths={[480, 720, 960]}
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            priority
-            className="h-full w-full object-cover"
-          />
+          <div className={frameClass}>
+            <OptimizedImage
+              src={slides[0]}
+              alt={alt}
+              width={960}
+              widths={[480, 720, 960]}
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              priority
+              className={imageClass}
+            />
+          </div>
         </button>
         {lightbox && (
           <Lightbox images={slides} index={0} alt={alt} onClose={() => setLightbox(false)} onGo={go} />
@@ -68,7 +72,7 @@ export default function ProductGallery({ images, alt }: ProductGalleryProps) {
   return (
     <>
       <div
-        className="relative overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
+        className="relative overflow-hidden rounded-2xl"
         onTouchStart={(e) => setTouchStartX(e.changedTouches[0]?.clientX ?? null)}
         onTouchEnd={(e) => {
           if (touchStartX == null) return
@@ -78,15 +82,17 @@ export default function ProductGallery({ images, alt }: ProductGalleryProps) {
         }}
       >
         <button type="button" className="block w-full" onClick={() => setLightbox(true)}>
-          <OptimizedImage
-            src={slides[safeIndex]}
-            alt={`${alt} — ${safeIndex + 1}`}
-            width={960}
-            widths={[480, 720, 960]}
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            priority={safeIndex === 0}
-            className="aspect-[4/3] w-full object-cover"
-          />
+          <div className={frameClass}>
+            <OptimizedImage
+              src={slides[safeIndex]}
+              alt={`${alt} — ${safeIndex + 1}`}
+              width={960}
+              widths={[480, 720, 960]}
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              priority={safeIndex === 0}
+              className={imageClass}
+            />
+          </div>
         </button>
 
         <button

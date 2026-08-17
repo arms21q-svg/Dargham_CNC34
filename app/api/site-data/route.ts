@@ -62,6 +62,10 @@ function assertSiteData(body: SiteData) {
     if (typeof p.image === 'string' && p.image.startsWith('data:') && p.image.length > 900_000) {
       throw new Error(`صورة المنتج "${p.title?.ar || p.id}" كبيرة جداً بعد الضغط`)
     }
+    const att = p.attachment
+    if (att?.data?.startsWith('data:') && att.data.length > 4_500_000) {
+      throw new Error(`ملف المرفق "${att.name || p.id}" كبير جداً`)
+    }
   }
 }
 
@@ -107,9 +111,7 @@ export async function GET(req: NextRequest) {
       { ok: true, data: payload },
       {
         headers: {
-          'Cache-Control': isAdmin
-            ? 'no-store, no-cache, must-revalidate'
-            : 'public, s-maxage=60, stale-while-revalidate=300',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
           Vary: 'Authorization',
         },
       }

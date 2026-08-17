@@ -90,6 +90,10 @@ export type ProductMapperInput = {
   published?: boolean
   colors?: string[]
   sortOrder?: number
+  attachmentData?: string
+  attachmentName?: string
+  attachmentMime?: string
+  attachmentSize?: number
 }
 
 export function toSiteData(
@@ -161,6 +165,15 @@ export function toSiteData(
         featured: p.featured ?? false,
         published: p.published !== false,
         colors: p.colors ?? [],
+        attachment:
+          p.attachmentName?.trim() || p.attachmentData?.trim()
+            ? {
+                name: p.attachmentName ?? '',
+                mime: p.attachmentMime ?? '',
+                size: p.attachmentSize ?? 0,
+                data: p.attachmentData?.trim() || undefined,
+              }
+            : undefined,
       }
     }),
     managers: managers.map((m) => ({
@@ -253,6 +266,10 @@ export function productFromSiteData(
     published: p.published !== false,
     colors: Array.isArray(p.colors) ? p.colors : [],
     sortOrder: index,
+    attachmentData: p.attachment?.data?.trim() ?? '',
+    attachmentName: p.attachment?.name?.trim() ?? '',
+    attachmentMime: p.attachment?.mime?.trim() ?? '',
+    attachmentSize: p.attachment?.size ?? 0,
   }
 }
 

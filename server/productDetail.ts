@@ -21,6 +21,9 @@ export const PRODUCT_DETAIL_SELECT = {
   featured: true,
   published: true,
   colors: true,
+  attachmentName: true,
+  attachmentMime: true,
+  attachmentSize: true,
 } as const
 
 /** Compact card fields for related / list thumbnails. */
@@ -62,6 +65,9 @@ export type ProductDetailRow = {
   featured: boolean
   published: boolean
   colors: string[]
+  attachmentName?: string
+  attachmentMime?: string
+  attachmentSize?: number
 }
 
 async function fetchProductById(id: string): Promise<ProductDetailRow | null> {

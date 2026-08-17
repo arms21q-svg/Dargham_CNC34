@@ -64,6 +64,10 @@ function resolveProductImage(product: Product, url: string | undefined, index: n
   return ''
 }
 
+function productAttachmentUrl(productId: string): string {
+  return `/api/products/${encodeURIComponent(productId)}/attachment`
+}
+
 /** Drop embedded base64 from public payloads — serve via /api/.../image instead. */
 export function lightPublicSiteData(data: SiteData): SiteData {
   const slides = (data.home?.slideImages ?? []).map((url, index) => resolveSlideImage(url, index)).filter(Boolean)
@@ -77,10 +81,20 @@ export function lightPublicSiteData(data: SiteData): SiteData {
     const primarySource = p.image || ''
     const primary = resolveProductImage(p, primarySource, 0)
 
+    const attachment = p.attachment?.name?.trim()
+      ? {
+          name: p.attachment.name,
+          mime: p.attachment.mime,
+          size: p.attachment.size,
+          data: productAttachmentUrl(p.id),
+        }
+      : undefined
+
     return {
       ...p,
       image: primary,
       images: primary ? [primary] : [],
+      attachment,
     }
   })
 

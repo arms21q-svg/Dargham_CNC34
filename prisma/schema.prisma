@@ -108,6 +108,11 @@ model Product {
   featured      Boolean  @default(false)
   /** Gallery images; `image` is the primary/cover */
   images       String[] @default([])
+  /** Optional downloadable file (PDF, catalog, design) — base64 data URL */
+  attachmentData String @default("")
+  attachmentName String @default("")
+  attachmentMime String @default("")
+  attachmentSize Int    @default(0)
   /** false = hidden from public site */
   published    Boolean  @default(true)
   colors        String[]

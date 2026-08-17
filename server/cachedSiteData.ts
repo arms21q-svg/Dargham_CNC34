@@ -27,6 +27,9 @@ const PUBLIC_PRODUCT_SELECT = {
   published: true,
   colors: true,
   sortOrder: true,
+  attachmentName: true,
+  attachmentMime: true,
+  attachmentSize: true,
 } satisfies PrismaTypes.ProductSelect
 
 /** Minimal SSR bootstrap — cover image only, no gallery / materials / dimensions. */
@@ -43,6 +46,9 @@ const BOOTSTRAP_PRODUCT_SELECT = {
   featured: true,
   published: true,
   sortOrder: true,
+  attachmentName: true,
+  attachmentMime: true,
+  attachmentSize: true,
 } satisfies PrismaTypes.ProductSelect
 
 type FetchOptions = {

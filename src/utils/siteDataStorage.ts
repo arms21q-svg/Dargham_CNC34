@@ -17,7 +17,7 @@ const STATIC_SAVE_ENDPOINT = apiUrl('/api/save-data.php')
 /** Publish can take longer with many products; keep under Vercel maxDuration. */
 const FETCH_TIMEOUT_MS = 55_000
 const LOGIN_TIMEOUT_MS = 20_000
-const MAX_PUBLISH_CHARS = 3_200_000
+export const MAX_PUBLISH_CHARS = 3_400_000
 
 export function countEmbeddedImages(data: SiteData): number {
   let count = 0
@@ -545,8 +545,7 @@ export async function publishSiteData(
   data: SiteData
 ): Promise<{ ok: boolean; message: string; data?: SiteData }> {
   const token = getAuthToken()
-  // Never send a password via general publish — credentials use /api/auth/update-credentials.
-  const payload: SiteData = {
+  let payload: SiteData = {
     ...data,
     updatedAt: Date.now(),
     settings: {
@@ -555,25 +554,35 @@ export async function publishSiteData(
     },
   }
 
-  // Prevent giant base64 payloads from silently 500'ing on Vercel
-  const embeddedCount = countEmbeddedImages(payload)
-  try {
-    const estimated = JSON.stringify(payload).length
-    if (estimated > MAX_PUBLISH_CHARS) {
-      return {
-        ok: false,
-        message:
-          embeddedCount > 0
-            ? `حجم البيانات كبير جداً (${embeddedCount} صورة). قلّل عدد الصور أو استخدم صوراً أصغر ثم أعد النشر`
-            : 'حجم البيانات كبير جداً للنشر. قلّل عدد الصور أو استخدم صوراً أصغر',
-      }
+  let embeddedCount = countEmbeddedImages(payload)
+  let estimated = estimateSiteDataSize(payload)
+  const sizeBeforeCompress = estimated
+  let didCompress = false
+
+  if (embeddedCount > 0 && estimated > MAX_PUBLISH_CHARS - 50_000) {
+    try {
+      const { prepareSiteDataForPublish } = await import('./publishCompress')
+      payload = await prepareSiteDataForPublish(payload)
+      embeddedCount = countEmbeddedImages(payload)
+      estimated = estimateSiteDataSize(payload)
+      didCompress = estimated < sizeBeforeCompress
+    } catch (err) {
+      console.warn('[publish] auto-compress failed', err)
     }
-    if (estimated > 2_400_000 && embeddedCount > 0) {
-      // Soft warning path still attempts publish — server may finish under new timeout.
-      console.warn('[publish] large payload', { estimated, embeddedCount })
+  }
+
+  if (estimated > MAX_PUBLISH_CHARS) {
+    return {
+      ok: false,
+      message:
+        embeddedCount > 0
+          ? `حجم البيانات كبير جداً (${embeddedCount} صورة) حتى بعد الضغط. انشر على دفعات (20–25 عمل) أو استخدم صوراً أقل دقة`
+          : 'حجم البيانات كبير جداً للنشر',
     }
-  } catch {
-    // ignore stringify errors — API will validate
+  }
+
+  if (estimated > 2_400_000 && embeddedCount > 0) {
+    console.warn('[publish] large payload', { estimated, embeddedCount })
   }
 
   if (!token) {
@@ -626,7 +635,9 @@ export async function publishSiteData(
         saveSiteDataLocal(saved)
         return {
           ok: true,
-          message: json.message ?? 'تم النشر على قاعدة البيانات',
+          message: didCompress
+            ? 'تم النشر على قاعدة البيانات (تم ضغط الصور تلقائياً للنشر)'
+            : (json.message ?? 'تم النشر على قاعدة البيانات'),
           data: saved,
         }
       }

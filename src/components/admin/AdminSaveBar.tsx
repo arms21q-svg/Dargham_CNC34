@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSiteData } from '../../context/SiteDataContext'
 import { countEmbeddedImages, estimateSiteDataSize } from '../../utils/siteDataStorage'
+import { needsPublishCompression } from '../../utils/publishCompress'
 
 export default function AdminSaveBar() {
   const { siteData, saveDraft, publish } = useSiteData()
@@ -16,11 +17,11 @@ export default function AdminSaveBar() {
     const embedded = countEmbeddedImages(siteData)
     const size = estimateSiteDataSize(siteData)
     if (embedded === 0) return null
-    if (size > 3_200_000) {
-      return `⚠ ${embedded} صورة مرفوعة — الحجم كبير جداً ولن يُقبل النشر. قلّل عدد الصور أو استخدم صوراً أصغر`
+    if (needsPublishCompression(siteData)) {
+      return `ℹ ${embedded} صورة — سيتم ضغطها تلقائياً عند النشر (قد يستغرق دقيقة)`
     }
-    if (size > 2_000_000 || embedded >= 4) {
-      return `⚠ ${embedded} صورة مرفوعة — قد تبطّئ النشر. يُفضّل رفع دفعات أصغر`
+    if (size > 2_000_000 || embedded >= 25) {
+      return `ℹ ${embedded} صورة — النشر قد يستغرق وقتاً أطول`
     }
     return null
   }, [siteData])

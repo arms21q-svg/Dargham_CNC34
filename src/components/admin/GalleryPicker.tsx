@@ -74,7 +74,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
           }
           seen.add(fp)
 
-          const dataUrl = await fileToDataUrl(file, { maxSide: 1200, quality: 0.78 })
+          const dataUrl = await fileToDataUrl(file, { maxSide: 900, quality: 0.68 })
           if (existing.has(dataUrl)) {
             skipped++
             setProgress({ done: i + 1, total: list.length })

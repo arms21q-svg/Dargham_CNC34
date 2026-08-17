@@ -82,7 +82,7 @@ export default function BulkWorksImport({
             continue
           }
 
-          const image = await fileToDataUrl(file, { maxSide: 1200, quality: 0.78 })
+          const image = await fileToDataUrl(file, { maxSide: 800, quality: 0.62 })
           if (existingFingerprints.has(image.slice(0, 120))) {
             skipped++
             setProgress({ done: i + 1, total: list.length })

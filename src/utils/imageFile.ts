@@ -131,6 +131,48 @@ export async function fileToDataUrl(
   return dataUrl
 }
 
+/** Re-compress an existing data URL to fit publish payload budget (browser only). */
+export async function compressDataUrlForPublish(
+  dataUrl: string,
+  maxChars: number
+): Promise<string> {
+  if (!dataUrl.startsWith('data:')) return dataUrl
+  if (dataUrl.length <= maxChars) return dataUrl
+  if (typeof document === 'undefined') return dataUrl
+
+  const img = await loadImageElement(dataUrl)
+  const srcW = img.naturalWidth || img.width
+  const srcH = img.naturalHeight || img.height
+
+  const steps: Array<{ side: number; quality: number }> = [
+    { side: 1000, quality: 0.68 },
+    { side: 880, quality: 0.62 },
+    { side: 760, quality: 0.56 },
+    { side: 640, quality: 0.5 },
+    { side: 520, quality: 0.45 },
+    { side: 420, quality: 0.4 },
+  ]
+
+  let best = dataUrl
+  for (const step of steps) {
+    const canvas = drawScaled(img, srcW, srcH, step.side)
+    const candidate = canvas.toDataURL('image/jpeg', step.quality)
+    best = candidate
+    if (candidate.length <= maxChars) return candidate
+  }
+
+  return best
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('تعذر قراءة الصورة للضغط'))
+    img.src = src
+  })
+}
+
 /** Fast fingerprint for duplicate detection during bulk upload. */
 export async function fileFingerprint(file: File): Promise<string> {
   const sample = file.slice(0, Math.min(file.size, 512 * 1024))

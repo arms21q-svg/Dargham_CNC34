@@ -1,9 +1,10 @@
 import { unstable_cache } from 'next/cache'
 import { prisma } from './db'
+import { attachmentColumnsExist } from './attachmentSchema'
 import { toPublicProductImage } from './mediaUrls'
 
 /** Fields needed to render the product detail page (no vectors / hashes). */
-export const PRODUCT_DETAIL_SELECT = {
+const PRODUCT_DETAIL_SELECT_BASE = {
   id: true,
   titleAr: true,
   titleEn: true,
@@ -21,9 +22,17 @@ export const PRODUCT_DETAIL_SELECT = {
   featured: true,
   published: true,
   colors: true,
+} as const
+
+const PRODUCT_DETAIL_ATTACHMENT_SELECT = {
   attachmentName: true,
   attachmentMime: true,
   attachmentSize: true,
+} as const
+
+export const PRODUCT_DETAIL_SELECT = {
+  ...PRODUCT_DETAIL_SELECT_BASE,
+  ...PRODUCT_DETAIL_ATTACHMENT_SELECT,
 } as const
 
 /** Compact card fields for related / list thumbnails. */
@@ -71,9 +80,14 @@ export type ProductDetailRow = {
 }
 
 async function fetchProductById(id: string): Promise<ProductDetailRow | null> {
+  const withAttachments = await attachmentColumnsExist()
+  const select = withAttachments
+    ? { ...PRODUCT_DETAIL_SELECT_BASE, ...PRODUCT_DETAIL_ATTACHMENT_SELECT }
+    : PRODUCT_DETAIL_SELECT_BASE
+
   const row = await prisma.product.findUnique({
     where: { id },
-    select: PRODUCT_DETAIL_SELECT,
+    select,
   })
   if (!row || row.published === false) return null
   return {

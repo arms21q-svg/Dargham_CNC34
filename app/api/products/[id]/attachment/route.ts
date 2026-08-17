@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@server/db'
 import { parseDataUrl } from '@server/parseDataUrl'
+import { attachmentColumnsExist } from '@server/attachmentSchema'
 import { isAttachmentProxyUrl } from '@server/mediaUrls'
 
 export const runtime = 'nodejs'
@@ -11,6 +12,10 @@ type Props = { params: Promise<{ id: string }> }
 export async function GET(_req: NextRequest, { params }: Props) {
   try {
     const { id } = await params
+
+    if (!(await attachmentColumnsExist())) {
+      return new NextResponse('Not found', { status: 404 })
+    }
 
     const product = await prisma.product.findUnique({
       where: { id },

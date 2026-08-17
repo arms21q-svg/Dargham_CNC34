@@ -7,6 +7,7 @@ import {
   productFromSiteData,
 } from './mappers'
 import { isProxyMediaUrl } from './mediaUrls'
+import { attachmentColumnsExist } from './attachmentSchema'
 import type { SiteData } from '../src/types/siteData'
 
 type ProductRow = ReturnType<typeof productFromSiteData>
@@ -137,10 +138,10 @@ function productContentEqual(
     published: boolean
     colors: string[]
     sortOrder: number
-    attachmentData: string
-    attachmentName: string
-    attachmentMime: string
-    attachmentSize: number
+    attachmentData?: string
+    attachmentName?: string
+    attachmentMime?: string
+    attachmentSize?: number
   },
   next: ProductRow
 ): boolean {
@@ -162,11 +163,20 @@ function productContentEqual(
     prev.published === next.published &&
     sameStringArray(prev.colors, next.colors) &&
     prev.sortOrder === next.sortOrder &&
-    prev.attachmentData === next.attachmentData &&
-    prev.attachmentName === next.attachmentName &&
-    prev.attachmentMime === next.attachmentMime &&
-    prev.attachmentSize === next.attachmentSize
+    (prev.attachmentData ?? '') === (next.attachmentData ?? '') &&
+    (prev.attachmentName ?? '') === (next.attachmentName ?? '') &&
+    (prev.attachmentMime ?? '') === (next.attachmentMime ?? '') &&
+    (prev.attachmentSize ?? 0) === (next.attachmentSize ?? 0)
   )
+}
+
+function stripAttachmentFields<T extends Record<string, unknown>>(row: T): T {
+  const copy = { ...row }
+  delete copy.attachmentData
+  delete copy.attachmentName
+  delete copy.attachmentMime
+  delete copy.attachmentSize
+  return copy
 }
 
 function managerContentEqual(
@@ -214,6 +224,37 @@ export async function syncSiteDataToDb(
   )
   const managers = dedupeById(body.managers).map((m, i) => managerFromSiteData(m, i))
 
+  const attachmentsEnabled = await attachmentColumnsExist()
+
+  const existingProductSelect = {
+    id: true,
+    titleAr: true,
+    titleEn: true,
+    descriptionAr: true,
+    descriptionEn: true,
+    category: true,
+    categoryId: true,
+    displayNumber: true,
+    image: true,
+    images: true,
+    materialsAr: true,
+    materialsEn: true,
+    dimensionsAr: true,
+    dimensionsEn: true,
+    featured: true,
+    published: true,
+    colors: true,
+    sortOrder: true,
+    ...(attachmentsEnabled
+      ? {
+          attachmentData: true,
+          attachmentName: true,
+          attachmentMime: true,
+          attachmentSize: true,
+        }
+      : {}),
+  } as const
+
   const [existingConfig, existingProducts, existingManagers, existingCategories] =
     await Promise.all([
     prisma.siteConfig.findUnique({
@@ -221,30 +262,7 @@ export async function syncSiteDataToDb(
       select: { slideImages: true },
     }),
     prisma.product.findMany({
-      select: {
-        id: true,
-        titleAr: true,
-        titleEn: true,
-        descriptionAr: true,
-        descriptionEn: true,
-        category: true,
-        categoryId: true,
-        displayNumber: true,
-        image: true,
-        images: true,
-        materialsAr: true,
-        materialsEn: true,
-        dimensionsAr: true,
-        dimensionsEn: true,
-        featured: true,
-        published: true,
-        colors: true,
-        sortOrder: true,
-        attachmentData: true,
-        attachmentName: true,
-        attachmentMime: true,
-        attachmentSize: true,
-      },
+      select: existingProductSelect,
     }),
     prisma.manager.findMany({
       select: {
@@ -296,6 +314,10 @@ export async function syncSiteDataToDb(
     }
     return categoryId === (p.categoryId ?? null) ? p : { ...p, categoryId }
   })
+
+  if (!attachmentsEnabled) {
+    products = products.map((p) => stripAttachmentFields(p))
+  }
 
   const configData = configFromSiteData(body, passwordHash)
   if (existingConfig?.slideImages?.length) {

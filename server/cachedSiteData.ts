@@ -2,13 +2,20 @@ import { Prisma } from '@prisma/client'
 import { cache } from 'react'
 import type { Prisma as PrismaTypes } from '@prisma/client'
 import { prisma } from './db'
+import { attachmentColumnsExist } from './attachmentSchema'
 import { isDatabaseConnectionError } from './dbErrors'
 import type { SiteData } from '@/types/siteData'
 import { createDefaultCategories, LEGACY_CATEGORY_SLUG } from '@/data/defaultCategories'
 import type { ProductMapperInput } from './mappers'
 
+const ATTACHMENT_META_SELECT = {
+  attachmentName: true,
+  attachmentMime: true,
+  attachmentSize: true,
+} satisfies PrismaTypes.ProductSelect
+
 /** Full public catalog — used by /api/site-data for visitors. */
-const PUBLIC_PRODUCT_SELECT = {
+const PUBLIC_PRODUCT_SELECT_BASE = {
   id: true,
   titleAr: true,
   titleEn: true,
@@ -27,12 +34,9 @@ const PUBLIC_PRODUCT_SELECT = {
   published: true,
   colors: true,
   sortOrder: true,
-  attachmentName: true,
-  attachmentMime: true,
-  attachmentSize: true,
 } satisfies PrismaTypes.ProductSelect
 
-/** Minimal SSR bootstrap — cover image only, no gallery / materials / dimensions. */
+/** Minimal SSR bootstrap — no attachment fields (layout must load before migration). */
 const BOOTSTRAP_PRODUCT_SELECT = {
   id: true,
   titleAr: true,
@@ -46,9 +50,28 @@ const BOOTSTRAP_PRODUCT_SELECT = {
   featured: true,
   published: true,
   sortOrder: true,
-  attachmentName: true,
-  attachmentMime: true,
-  attachmentSize: true,
+} satisfies PrismaTypes.ProductSelect
+
+/** Admin / full sync — all scalar fields except vectors. */
+const ADMIN_PRODUCT_SELECT_BASE = {
+  id: true,
+  titleAr: true,
+  titleEn: true,
+  descriptionAr: true,
+  descriptionEn: true,
+  category: true,
+  categoryId: true,
+  displayNumber: true,
+  image: true,
+  images: true,
+  materialsAr: true,
+  materialsEn: true,
+  dimensionsAr: true,
+  dimensionsEn: true,
+  featured: true,
+  published: true,
+  colors: true,
+  sortOrder: true,
 } satisfies PrismaTypes.ProductSelect
 
 type FetchOptions = {
@@ -193,32 +216,56 @@ async function fetchSiteDataLegacy(options?: FetchOptions): Promise<SiteData | n
   }
 }
 
+async function fetchProducts(options: FetchOptions): Promise<ProductMapperInput[]> {
+  const publicCatalog = options.publicCatalog ?? false
+  const bootstrap = options.bootstrap ?? false
+  const withAttachments = await attachmentColumnsExist()
+
+  if (bootstrap) {
+    return prisma.product.findMany({
+      where: { published: true },
+      orderBy: { sortOrder: 'asc' },
+      select: BOOTSTRAP_PRODUCT_SELECT,
+    })
+  }
+
+  if (publicCatalog) {
+    const select = withAttachments
+      ? { ...PUBLIC_PRODUCT_SELECT_BASE, ...ATTACHMENT_META_SELECT }
+      : PUBLIC_PRODUCT_SELECT_BASE
+    return prisma.product.findMany({
+      where: { published: true },
+      orderBy: { sortOrder: 'asc' },
+      select,
+    })
+  }
+
+  const select = withAttachments
+    ? {
+        ...ADMIN_PRODUCT_SELECT_BASE,
+        attachmentData: true,
+        ...ATTACHMENT_META_SELECT,
+      }
+    : ADMIN_PRODUCT_SELECT_BASE
+
+  return prisma.product.findMany({
+    orderBy: { sortOrder: 'asc' },
+    select,
+  })
+}
+
 async function fetchSiteDataRaw(options?: FetchOptions): Promise<SiteData | null> {
-  const publicCatalog = options?.publicCatalog ?? false
   const bootstrap = options?.bootstrap ?? false
 
   try {
-    const [config, managers, categories] = await Promise.all([
+    const [config, managers, categories, products] = await Promise.all([
       prisma.siteConfig.findUnique({ where: { id: 1 } }),
       bootstrap ? Promise.resolve([]) : prisma.manager.findMany({ orderBy: { sortOrder: 'asc' } }),
       prisma.portfolioCategory.findMany({ orderBy: { sortOrder: 'asc' } }),
+      fetchProducts(options ?? {}),
     ])
 
     if (!config) return null
-
-    const products = bootstrap
-      ? await prisma.product.findMany({
-          where: { published: true },
-          orderBy: { sortOrder: 'asc' },
-          select: BOOTSTRAP_PRODUCT_SELECT,
-        })
-      : publicCatalog
-        ? await prisma.product.findMany({
-            where: { published: true },
-            orderBy: { sortOrder: 'asc' },
-            select: PUBLIC_PRODUCT_SELECT,
-          })
-        : await prisma.product.findMany({ orderBy: { sortOrder: 'asc' } })
 
     const { toSiteData } = await import('./mappers')
     return toSiteData(config, products, managers, categories)

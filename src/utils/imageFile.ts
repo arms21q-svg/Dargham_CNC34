@@ -52,8 +52,16 @@ export async function fileToDataUrl(
   }
 
   if (dataUrl.length > MAX_DATA_URL_CHARS) {
-    throw new Error('الصورة كبيرة بعد الضغط. استخدم رابط URL بدل الرفع من الجهاز')
+    throw new Error('الصورة كبيرة بعد الضغط. جرّب صورة أصغر أو أقل دقة')
   }
 
   return dataUrl
+}
+
+/** Fast fingerprint for duplicate detection during bulk upload. */
+export async function fileFingerprint(file: File): Promise<string> {
+  const sample = file.slice(0, Math.min(file.size, 512 * 1024))
+  const buf = await sample.arrayBuffer()
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }

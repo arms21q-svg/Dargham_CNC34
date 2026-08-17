@@ -43,7 +43,7 @@ async function parseBody(req: NextRequest): Promise<SiteData> {
   if (!text) throw new Error('جسم الطلب فارغ')
   if (text.length > MAX_BODY_CHARS) {
     throw new Error(
-      'حجم البيانات كبير جداً. استخدم روابط صور بدلاً من رفع صور كبيرة داخل الصفحة'
+      'حجم البيانات كبير جداً. قلّل عدد الصور أو استخدم صوراً أصغر قبل النشر'
     )
   }
   return JSON.parse(text) as SiteData
@@ -60,25 +60,32 @@ function assertSiteData(body: SiteData) {
     if (!p?.id) throw new Error(`منتج #${i + 1} بدون معرّف`)
     if (!p.title?.ar && !p.title?.en) throw new Error(`منتج #${i + 1} بدون عنوان`)
     if (typeof p.image === 'string' && p.image.startsWith('data:') && p.image.length > 900_000) {
-      throw new Error(`صورة المنتج "${p.title?.ar || p.id}" كبيرة جداً. ارفعها كرابط URL`)
+      throw new Error(`صورة المنتج "${p.title?.ar || p.id}" كبيرة جداً بعد الضغط`)
     }
   }
 }
 
 function errorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return 'فشل حفظ البيانات'
+  if (!(error instanceof Error)) {
+    return 'فشل حفظ البيانات'
+  }
 
-  const prismaError = error as Error & { code?: string }
-  if (prismaError.code === 'P2028') {
+  const { code, message } = error as Error & { code?: string }
+
+  if (code === 'P1001' || message.includes("Can't reach database server")) {
+    return 'تعذر الاتصال بقاعدة البيانات — تحقق من DATABASE_URL أو حالة Supabase'
+  }
+  if (code === 'P2028') {
     return 'انتهت مهلة المعاملة مع قاعدة البيانات — أعد المحاولة'
   }
-  if (prismaError.code === 'P2034') {
+  if (code === 'P2034') {
     return 'تعارض في قاعدة البيانات — أعد المحاولة'
   }
-  if (prismaError.message.includes('prepared statement') || prismaError.message.includes('pgbouncer')) {
+  if (message.includes('prepared statement') || message.includes('pgbouncer')) {
     return 'فشل الاتصال بقاعدة البيانات (PgBouncer) — أعد المحاولة'
   }
-  return prismaError.message || 'فشل حفظ البيانات'
+
+  return message || 'فشل حفظ البيانات'
 }
 
 export async function GET(req: NextRequest) {

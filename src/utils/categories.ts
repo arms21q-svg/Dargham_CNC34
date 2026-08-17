@@ -42,7 +42,52 @@ export function nextDisplayNumber(products: Product[], categoryId: string): numb
   const max = products
     .filter((p) => p.categoryId === categoryId)
     .reduce((acc, p) => Math.max(acc, p.displayNumber ?? 0), 0)
-  return max + 1
+  return Math.max(1, max + 1)
+}
+
+/** Next N sequential display numbers for bulk import (e.g. 4,5,6). */
+export function allocateDisplayNumbers(
+  products: Product[],
+  categoryId: string,
+  count: number
+): number[] {
+  const next = nextDisplayNumber(products, categoryId)
+  return Array.from({ length: count }, (_, i) => next + i)
+}
+
+export function isDisplayNumberTaken(
+  products: Product[],
+  categoryId: string,
+  displayNumber: number,
+  excludeProductId?: string
+): boolean {
+  if (displayNumber < 1) return true
+  return products.some(
+    (p) =>
+      p.categoryId === categoryId &&
+      p.id !== excludeProductId &&
+      (p.displayNumber ?? 0) === displayNumber
+  )
+}
+
+/** Validate display number before save — returns Arabic error or null if ok. */
+export function validateProductDisplayNumber(
+  products: Product[],
+  categoryId: string,
+  displayNumber: number,
+  productId: string,
+  batchNumbers: number[] = []
+): string | null {
+  if (!Number.isFinite(displayNumber) || displayNumber < 1) {
+    return 'رقم العمل يجب أن يكون 1 أو أكبر'
+  }
+  if (isDisplayNumberTaken(products, categoryId, displayNumber, productId)) {
+    return `الرقم ${displayNumber} مستخدم مسبقاً في هذا التصنيف`
+  }
+  if (batchNumbers.filter((n) => n === displayNumber).length > 1) {
+    return `الرقم ${displayNumber} مكرر بين الأعمال الجديدة`
+  }
+  return null
 }
 
 export function categoryImageProxyPath(categoryId: string): string {

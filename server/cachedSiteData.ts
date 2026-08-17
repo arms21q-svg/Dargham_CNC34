@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { cache } from 'react'
 import type { Prisma as PrismaTypes } from '@prisma/client'
 import { prisma } from './db'
+import { isDatabaseConnectionError } from './dbErrors'
 import type { SiteData } from '@/types/siteData'
 import { createDefaultCategories, LEGACY_CATEGORY_SLUG } from '@/data/defaultCategories'
 import type { ProductMapperInput } from './mappers'
@@ -71,14 +72,17 @@ type LegacyProductRow = {
 }
 
 function isMissingCategoriesSchema(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false
-  if (error.code === 'P2021') {
-    const table = String(error.meta?.table ?? '')
-    return table.includes('PortfolioCategory')
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const metaStr = JSON.stringify(error.meta ?? {})
+    if (error.code === 'P2021') {
+      return /PortfolioCategory/i.test(metaStr)
+    }
+    if (error.code === 'P2022') {
+      return /categoryId|displayNumber/i.test(metaStr)
+    }
   }
-  if (error.code !== 'P2022') return false
-  const column = String(error.meta?.column ?? '')
-  return column.includes('categoryId') || column.includes('displayNumber')
+  const msg = error instanceof Error ? error.message : String(error)
+  return /PortfolioCategory/i.test(msg) && /does not exist/i.test(msg)
 }
 
 function mapLegacyProducts(rows: LegacyProductRow[], bootstrap: boolean): ProductMapperInput[] {
@@ -159,20 +163,28 @@ async function fetchSiteDataLegacy(options?: FetchOptions): Promise<SiteData | n
   const publicCatalog = options?.publicCatalog ?? false
   const bootstrap = options?.bootstrap ?? false
 
-  const [config, products, managers] = await Promise.all([
-    prisma.siteConfig.findUnique({ where: { id: 1 } }),
-    fetchLegacyProducts(publicCatalog, bootstrap),
-    bootstrap ? Promise.resolve([]) : prisma.manager.findMany({ orderBy: { sortOrder: 'asc' } }),
-  ])
+  try {
+    const [config, products, managers] = await Promise.all([
+      prisma.siteConfig.findUnique({ where: { id: 1 } }),
+      fetchLegacyProducts(publicCatalog, bootstrap),
+      bootstrap ? Promise.resolve([]) : prisma.manager.findMany({ orderBy: { sortOrder: 'asc' } }),
+    ])
 
-  if (!config) return null
+    if (!config) return null
 
-  console.warn(
-    '[site-data] categories schema missing in DB — legacy fallback active. Run: npm run db:migrate-categories'
-  )
+    console.warn(
+      '[site-data] categories schema missing in DB — legacy fallback active. Run: npm run db:migrate-categories'
+    )
 
-  const { toSiteData } = await import('./mappers')
-  return toSiteData(config, mapLegacyProducts(products, bootstrap), managers, [])
+    const { toSiteData } = await import('./mappers')
+    return toSiteData(config, mapLegacyProducts(products, bootstrap), managers, [])
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      console.warn('[site-data] database unavailable — skipping legacy fallback')
+      return null
+    }
+    throw error
+  }
 }
 
 async function fetchSiteDataRaw(options?: FetchOptions): Promise<SiteData | null> {
@@ -207,6 +219,10 @@ async function fetchSiteDataRaw(options?: FetchOptions): Promise<SiteData | null
   } catch (error) {
     if (isMissingCategoriesSchema(error)) {
       return fetchSiteDataLegacy(options)
+    }
+    if (isDatabaseConnectionError(error)) {
+      console.warn('[site-data] database unavailable — using client defaults until connection restores')
+      return null
     }
     throw error
   }

@@ -1,8 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { fileToDataUrl } from '../../utils/imageFile'
-import { normalizeImageUrlInput } from '../../utils/images'
+import { fileFingerprint, fileToDataUrl } from '../../utils/imageFile'
+import UploadProgressBar from './UploadProgressBar'
+
+const MAX_FILES = 20
 
 interface GalleryPickerProps {
   images: string[]
@@ -13,11 +15,13 @@ interface GalleryPickerProps {
 export default function GalleryPicker({ images, primary, onChange }: GalleryPickerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
-  const [urlDraft, setUrlDraft] = useState('')
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
 
   const gallery = images.length > 0 ? images : primary ? [primary] : []
+  const atLimit = gallery.length >= MAX_FILES
 
   const commit = (nextImages: string[], nextPrimary?: string) => {
     const clean = nextImages.filter(Boolean)
@@ -42,68 +46,94 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
     if (!files?.length) return
     setLoading(true)
     setError('')
+    setInfo('')
+    const remaining = MAX_FILES - gallery.length
+    if (remaining <= 0) {
+      setError(`الحد الأقصى ${MAX_FILES} صورة لكل عمل`)
+      setLoading(false)
+      return
+    }
+
+    const list = Array.from(files).slice(0, remaining)
+    setProgress({ done: 0, total: list.length })
+
+    const existing = new Set(gallery)
+    const seen = new Set<string>()
+    let skipped = 0
+
     try {
       const added: string[] = []
-      const list = Array.from(files).slice(0, 8)
-      for (const file of list) {
-        added.push(await fileToDataUrl(file, 900, 0.72))
+      for (let i = 0; i < list.length; i++) {
+        const file = list[i]!
+        try {
+          const fp = await fileFingerprint(file)
+          if (seen.has(fp)) {
+            skipped++
+            setProgress({ done: i + 1, total: list.length })
+            continue
+          }
+          seen.add(fp)
+
+          const dataUrl = await fileToDataUrl(file, 900, 0.72)
+          if (existing.has(dataUrl)) {
+            skipped++
+            setProgress({ done: i + 1, total: list.length })
+            continue
+          }
+          existing.add(dataUrl)
+          added.push(dataUrl)
+        } catch (fileErr) {
+          console.warn('[gallery] skip file', fileErr)
+        }
+        setProgress({ done: i + 1, total: list.length })
+      }
+
+      if (added.length === 0) {
+        setError(skipped > 0 ? 'جميع الصور المختارة مكررة أو تعذر معالجتها' : 'تعذر معالجة الصور المختارة')
+        return
       }
       commit([...gallery, ...added])
+      if (skipped > 0) {
+        setInfo(`تم تخطي ${skipped} صورة مكررة`)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذر رفع الصور')
     } finally {
       setLoading(false)
+      setProgress(null)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
 
-  const addUrl = () => {
-    const url = normalizeImageUrlInput(urlDraft)
-    if (!url) return
-    if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) {
-      setError('استخدم رابطاً يبدأ بـ https://')
-      return
-    }
-    setError('')
-    commit([...gallery, url])
-    setUrlDraft('')
-  }
-
   return (
     <div className="space-y-3">
-      <label className="form-label">صور العمل (صورة واحدة أو عدة صور)</label>
+      <label className="form-label">
+        صور العمل ({gallery.length}/{MAX_FILES}) — رفع من الجهاز فقط
+      </label>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={loading}
-          className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
-        >
-          {loading ? 'جاري الرفع...' : 'رفع صور'}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => void addFiles(e.target.files)}
-        />
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={loading || atLimit}
+            className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+          >
+            {loading ? 'جاري الرفع...' : 'رفع صور (متعدد)'}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => void addFiles(e.target.files)}
+          />
+        </div>
+        {progress && <UploadProgressBar done={progress.done} total={progress.total} />}
       </div>
 
-      <div className="flex gap-2">
-        <input
-          className="input-field"
-          value={urlDraft}
-          onChange={(e) => setUrlDraft(e.target.value)}
-          placeholder="أو الصق رابط صورة https://..."
-        />
-        <button type="button" onClick={addUrl} className="btn-secondary shrink-0">
-          إضافة
-        </button>
-      </div>
-
+      {info && <p className="text-sm text-amber-600 dark:text-amber-400">{info}</p>}
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {gallery.length > 0 && (
@@ -127,7 +157,7 @@ export default function GalleryPicker({ images, primary, onChange }: GalleryPick
                     : 'border-gray-200 dark:border-gray-700'
                 } ${dragIndex === index ? 'opacity-60' : ''}`}
               >
-                <img src={src} alt="" className="aspect-square w-full object-cover" />
+                <img src={src} alt="" className="aspect-square w-full object-cover" loading="lazy" />
                 <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-black/55 p-1.5">
                   <button
                     type="button"

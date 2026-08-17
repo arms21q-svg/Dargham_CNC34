@@ -10,22 +10,30 @@ interface ProductGalleryProps {
 
 export default function ProductGallery({ images, alt }: ProductGalleryProps) {
   const slides = useMemo(() => images.filter(Boolean), [images])
-  const [index, setIndex] = useState(0)
+  const slidesKey = slides.join('|')
+  const [cursor, setCursor] = useState({ key: slidesKey, index: 0 })
+  const index = cursor.key === slidesKey ? cursor.index : 0
+  const setIndex = useCallback(
+    (next: number | ((prev: number) => number)) => {
+      setCursor((prev) => {
+        const base = prev.key === slidesKey ? prev.index : 0
+        const value = typeof next === 'function' ? next(base) : next
+        return { key: slidesKey, index: value }
+      })
+    },
+    [slidesKey]
+  )
   const [lightbox, setLightbox] = useState(false)
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
-  const slidesKey = slides.join('|')
-
-  useEffect(() => {
-    setIndex(0)
-  }, [slidesKey])
+  const safeIndex = slides.length === 0 ? 0 : Math.min(index, slides.length - 1)
 
   const go = useCallback(
     (delta: number) => {
       if (slides.length <= 1) return
       setIndex((i) => (i + delta + slides.length) % slides.length)
     },
-    [slides.length]
+    [slides.length, setIndex]
   )
 
   if (slides.length === 0) {
@@ -71,12 +79,12 @@ export default function ProductGallery({ images, alt }: ProductGalleryProps) {
       >
         <button type="button" className="block w-full" onClick={() => setLightbox(true)}>
           <OptimizedImage
-            src={slides[index]}
-            alt={`${alt} — ${index + 1}`}
+            src={slides[safeIndex]}
+            alt={`${alt} — ${safeIndex + 1}`}
             width={960}
             widths={[480, 720, 960]}
             sizes="(max-width: 1024px) 100vw, 50vw"
-            priority
+            priority={safeIndex === 0}
             className="aspect-[4/3] w-full object-cover"
           />
         </button>
@@ -106,7 +114,7 @@ export default function ProductGallery({ images, alt }: ProductGalleryProps) {
               aria-label={`Slide ${i + 1}`}
               onClick={() => setIndex(i)}
               className={`h-2 rounded-full transition-all ${
-                i === index ? 'w-5 bg-white' : 'w-2 bg-white/50'
+                i === safeIndex ? 'w-5 bg-white' : 'w-2 bg-white/50'
               }`}
             />
           ))}
@@ -114,7 +122,7 @@ export default function ProductGallery({ images, alt }: ProductGalleryProps) {
       </div>
 
       {lightbox && (
-        <Lightbox images={slides} index={index} alt={alt} onClose={() => setLightbox(false)} onGo={go} />
+        <Lightbox images={slides} index={safeIndex} alt={alt} onClose={() => setLightbox(false)} onGo={go} />
       )}
     </>
   )
@@ -189,6 +197,8 @@ function Lightbox({
         src={images[index]}
         alt={`${alt} — ${index + 1}`}
         className="max-h-[90vh] max-w-full object-contain"
+        loading="lazy"
+        decoding="async"
         onClick={(e) => e.stopPropagation()}
       />
     </div>

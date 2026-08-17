@@ -12,7 +12,6 @@ import {
 } from '@/lib/seo'
 import { tajawal, inter } from '@/lib/fonts'
 import { getPublicSiteBootstrap } from '@server/publicSiteBootstrap'
-import { optimizeImageUrl } from '@/utils/images'
 import './globals.css'
 
 /** ISR for public HTML — admin routes override with force-dynamic. */
@@ -112,14 +111,8 @@ export const viewport: Viewport = {
 
 const themeScript = `(function(){try{var theme=localStorage.getItem('dorgham-cnc-theme');var isDark=theme==='dark'||(theme!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',isDark);document.documentElement.style.colorScheme=isDark?'dark':'light';}catch(e){}})();`
 
-function heroPreloadHref(src: string): string {
-  const resolved = src.startsWith('http') ? src : absoluteUrl(src)
-  return optimizeImageUrl(resolved, { width: 900, quality: 78 })
-}
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const bootstrap = await getPublicSiteBootstrap()
-  const heroSrc = bootstrap?.home?.slideImages?.[0]
 
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning className={`${tajawal.variable} ${inter.variable}`}>
@@ -127,9 +120,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="preconnect" href={absoluteUrl('/')} />
-        {heroSrc ? (
-          <link rel="preload" as="image" href={heroPreloadHref(heroSrc)} fetchPriority="high" />
-        ) : null}
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
         </Script>

@@ -36,11 +36,18 @@ export function isSiteDataNewer(next: SiteData, prev: SiteData): boolean {
   return (next.updatedAt ?? 0) > (prev.updatedAt ?? 0)
 }
 
-/** Authenticated sessions need full API media; equal updatedAt must not keep stripped bootstrap. */
+/** Authenticated sessions need full API media; refresh when catalog changed on server. */
 export function shouldApplyIncomingSiteData(incoming: SiteData, current: SiteData): boolean {
   if (getAuthToken()) return true
   if (isSiteDataNewer(incoming, current)) return true
-  return countCatalogImages(incoming) > countCatalogImages(current)
+  if ((incoming.products?.length ?? 0) !== (current.products?.length ?? 0)) return true
+  if (countCatalogImages(incoming) > countCatalogImages(current)) return true
+  const incomingIds = new Set((incoming.products ?? []).map((p) => p.id))
+  const currentIds = new Set((current.products ?? []).map((p) => p.id))
+  for (const id of incomingIds) {
+    if (!currentIds.has(id)) return true
+  }
+  return false
 }
 
 function countCatalogImages(data: SiteData): number {

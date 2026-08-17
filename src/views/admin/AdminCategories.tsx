@@ -1,12 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import type { PortfolioCategory, Product } from '../../types/siteData'
+import type { PortfolioCategory, Product, SiteData } from '../../types/siteData'
 import { useSiteData } from '../../context/SiteDataContext'
 import AdminSaveBar from '../../components/admin/AdminSaveBar'
+import BulkWorksImport from '../../components/admin/BulkWorksImport'
 import ImagePicker from '../../components/admin/ImagePicker'
 import GalleryPicker from '../../components/admin/GalleryPicker'
-import { nextDisplayNumber, productsInCategory } from '../../utils/categories'
+import { nextDisplayNumber, productsInCategory, validateProductDisplayNumber } from '../../utils/categories'
 import { slugify, uniqueSlug } from '../../utils/slug'
 
 const emptyCategory = (taken: Set<string>): PortfolioCategory => ({
@@ -39,8 +40,11 @@ export default function AdminCategories() {
     updateCategory,
     deleteCategory,
     addProduct,
+    addProducts,
     updateProduct,
     deleteProduct,
+    updateProducts,
+    publish,
   } = useSiteData()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -48,7 +52,14 @@ export default function AdminCategories() {
   const [categoryForm, setCategoryForm] = useState<PortfolioCategory | null>(null)
   const [editingWork, setEditingWork] = useState<Product | null>(null)
   const [workForm, setWorkForm] = useState<Product | null>(null)
+  const [workFormError, setWorkFormError] = useState('')
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [autoPublishOnSave, setAutoPublishOnSave] = useState(true)
+  const [savingWork, setSavingWork] = useState(false)
+  const [autoPublishMessage, setAutoPublishMessage] = useState('')
+  const [workSearch, setWorkSearch] = useState('')
+  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set())
 
   const categories = useMemo(
     () => [...(siteData.categories ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -60,6 +71,20 @@ export default function AdminCategories() {
     () => (selected ? productsInCategory(siteData.products, selected.id, false) : []),
     [selected, siteData.products]
   )
+
+  const filteredWorks = useMemo(() => {
+    const q = workSearch.trim().toLowerCase()
+    if (!q) return works
+    return works.filter((p) => {
+      const ar = p.title.ar?.toLowerCase() ?? ''
+      const en = p.title.en?.toLowerCase() ?? ''
+      const num = String(p.displayNumber)
+      return ar.includes(q) || en.includes(q) || num.includes(q)
+    })
+  }, [works, workSearch])
+
+  const allFilteredSelected =
+    filteredWorks.length > 0 && filteredWorks.every((p) => selectedWorkIds.has(p.id))
 
   if (loading) {
     return (
@@ -124,11 +149,23 @@ export default function AdminCategories() {
 
   const startAddWork = () => {
     if (!selected) return
+    setBulkOpen(false)
+    setWorkFormError('')
     setEditingWork(null)
     setWorkForm(emptyWork(selected.id, nextDisplayNumber(siteData.products, selected.id)))
   }
 
+  const startBulkAdd = () => {
+    if (!selected) return
+    setWorkForm(null)
+    setEditingWork(null)
+    setWorkFormError('')
+    setBulkOpen(true)
+  }
+
   const startEditWork = (product: Product) => {
+    setBulkOpen(false)
+    setWorkFormError('')
     setEditingWork(product)
     setWorkForm({
       ...product,
@@ -142,9 +179,25 @@ export default function AdminCategories() {
     })
   }
 
-  const saveWorkForm = () => {
-    if (!workForm || !selected) return
-    if (!workForm.title.ar.trim() && !workForm.title.en.trim()) return
+  const saveWorkForm = async () => {
+    if (!workForm || !selected || savingWork) return
+    if (!workForm.title.ar.trim() && !workForm.title.en.trim()) {
+      setWorkFormError('أدخل اسم العمل (عربي أو إنجليزي)')
+      return
+    }
+
+    const displayNumber = Math.max(1, workForm.displayNumber ?? 1)
+    const numberError = validateProductDisplayNumber(
+      siteData.products,
+      selected.id,
+      displayNumber,
+      editingWork?.id ?? workForm.id
+    )
+    if (numberError) {
+      setWorkFormError(numberError)
+      return
+    }
+
     const gallery =
       Array.isArray(workForm.images) && workForm.images.length > 0
         ? workForm.images
@@ -155,6 +208,7 @@ export default function AdminCategories() {
       ...workForm,
       categoryId: selected.id,
       category: selected.slug as Product['category'],
+      displayNumber,
       image: workForm.image || gallery[0] || '',
       images: gallery,
       published: workForm.published !== false,
@@ -163,10 +217,114 @@ export default function AdminCategories() {
           ? workForm.description
           : undefined,
     }
+
+    const nextSiteData: SiteData = {
+      ...siteData,
+      products: editingWork
+        ? siteData.products.map((p) => (p.id === payload.id ? payload : p))
+        : [...siteData.products, payload],
+    }
+
     if (editingWork) updateProduct(payload)
     else addProduct(payload)
     setWorkForm(null)
     setEditingWork(null)
+    setWorkFormError('')
+
+    if (autoPublishOnSave) {
+      setSavingWork(true)
+      setAutoPublishMessage('')
+      const result = await publish(nextSiteData)
+      setSavingWork(false)
+      setAutoPublishMessage(result.ok ? '✓ تم حفظ العمل ونشره على الموقع' : `✗ ${result.message}`)
+      setTimeout(() => setAutoPublishMessage(''), 6000)
+    }
+  }
+
+  const saveBulkWorks = async (items: Product[]) => {
+    if (savingWork) return
+    const nextSiteData: SiteData = {
+      ...siteData,
+      products: [...siteData.products, ...items],
+    }
+    addProducts(items)
+    setBulkOpen(false)
+    setSelectedWorkIds(new Set())
+
+    if (autoPublishOnSave) {
+      setSavingWork(true)
+      setAutoPublishMessage('')
+      const result = await publish(nextSiteData)
+      setSavingWork(false)
+      setAutoPublishMessage(
+        result.ok ? `✓ تم إضافة ${items.length} عمل ونشرها على الموقع` : `✗ ${result.message}`
+      )
+      setTimeout(() => setAutoPublishMessage(''), 6000)
+    }
+  }
+
+  const toggleWorkSelection = (id: string) => {
+    setSelectedWorkIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAllFiltered = () => {
+    if (allFilteredSelected) {
+      setSelectedWorkIds((prev) => {
+        const next = new Set(prev)
+        for (const p of filteredWorks) next.delete(p.id)
+        return next
+      })
+    } else {
+      setSelectedWorkIds((prev) => {
+        const next = new Set(prev)
+        for (const p of filteredWorks) next.add(p.id)
+        return next
+      })
+    }
+  }
+
+  const applyBulkSiteChange = async (nextProducts: Product[], successMsg: string) => {
+    if (savingWork || selectedWorkIds.size === 0) return
+    const nextSiteData: SiteData = { ...siteData, products: nextProducts }
+    updateProducts(nextProducts)
+    setSelectedWorkIds(new Set())
+
+    if (autoPublishOnSave) {
+      setSavingWork(true)
+      setAutoPublishMessage('')
+      const result = await publish(nextSiteData)
+      setSavingWork(false)
+      setAutoPublishMessage(result.ok ? `✓ ${successMsg}` : `✗ ${result.message}`)
+      setTimeout(() => setAutoPublishMessage(''), 6000)
+    } else {
+      setAutoPublishMessage(`✓ ${successMsg} — اضغط «نشر على الموقع»`)
+      setTimeout(() => setAutoPublishMessage(''), 6000)
+    }
+  }
+
+  const bulkDeleteWorks = async () => {
+    if (selectedWorkIds.size === 0) return
+    if (!window.confirm(`حذف ${selectedWorkIds.size} عمل؟`)) return
+    const ids = selectedWorkIds
+    const nextProducts = siteData.products.filter((p) => !ids.has(p.id))
+    await applyBulkSiteChange(nextProducts, `تم حذف ${ids.size} أعمال`)
+  }
+
+  const bulkSetPublished = async (published: boolean) => {
+    if (selectedWorkIds.size === 0) return
+    const ids = selectedWorkIds
+    const nextProducts = siteData.products.map((p) =>
+      ids.has(p.id) ? { ...p, published } : p
+    )
+    await applyBulkSiteChange(
+      nextProducts,
+      published ? `تم نشر ${ids.size} أعمال` : `تم إخفاء ${ids.size} أعمال`
+    )
   }
 
   return (
@@ -312,6 +470,9 @@ export default function AdminCategories() {
                     setSelectedId(c.id)
                     setWorkForm(null)
                     setEditingWork(null)
+                    setBulkOpen(false)
+                    setSelectedWorkIds(new Set())
+                    setWorkSearch('')
                   }}
                 >
                   <div className="font-medium text-gray-800 dark:text-gray-100">{c.title.ar || c.title.en}</div>
@@ -344,18 +505,94 @@ export default function AdminCategories() {
                 <h2 className="font-semibold text-gray-800 dark:text-gray-100">
                   أعمال: {selected.title.ar || selected.title.en}
                 </h2>
-                <button type="button" onClick={startAddWork} className="btn-primary text-sm">
-                  + إضافة عمل
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={startAddWork} className="btn-primary text-sm">
+                    + إضافة عمل
+                  </button>
+                  <button type="button" onClick={startBulkAdd} className="btn-secondary text-sm">
+                    + إضافة عدة أعمال
+                  </button>
+                </div>
+              </div>
+
+              {bulkOpen && (
+                <BulkWorksImport
+                  categoryId={selected.id}
+                  categorySlug={selected.slug}
+                  products={siteData.products}
+                  saving={savingWork}
+                  onSave={saveBulkWorks}
+                  onCancel={() => setBulkOpen(false)}
+                />
+              )}
+
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <input
+                  className="input-field max-w-md"
+                  placeholder="بحث بالاسم أو رقم العمل..."
+                  value={workSearch}
+                  onChange={(e) => setWorkSearch(e.target.value)}
+                />
+                {selectedWorkIds.size > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    <span className="self-center text-xs text-gray-500">
+                      {selectedWorkIds.size} محدد
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void bulkSetPublished(true)}
+                      disabled={savingWork}
+                      className="btn-secondary text-xs disabled:opacity-60"
+                    >
+                      نشر المحدد
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void bulkSetPublished(false)}
+                      disabled={savingWork}
+                      className="btn-secondary text-xs disabled:opacity-60"
+                    >
+                      إخفاء المحدد
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void bulkDeleteWorks()}
+                      disabled={savingWork}
+                      className="text-xs text-red-600 disabled:opacity-60"
+                    >
+                      حذف المحدد
+                    </button>
+                  </div>
+                )}
               </div>
 
               {workForm && (
                 <div className="mb-6 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
                   <h3 className="mb-3 font-medium">{editingWork ? 'تعديل عمل' : 'إضافة عمل'}</h3>
-                  <div className="mb-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800">
-                    رقم العمل: <strong>{workForm.displayNumber}</strong> (تلقائي)
-                  </div>
+                  {workFormError && (
+                    <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                      {workFormError}
+                    </p>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="form-label">رقم العمل</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="input-field"
+                        value={workForm.displayNumber ?? 1}
+                        onChange={(e) =>
+                          setWorkForm({
+                            ...workForm,
+                            displayNumber: Math.max(1, Number(e.target.value) || 1),
+                          })
+                        }
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        تلقائي عند الإضافة — يمكنك تغييره (فريد داخل التصنيف)
+                      </p>
+                    </div>
                     <div>
                       <label className="form-label">الاسم (عربي)</label>
                       <input
@@ -411,14 +648,20 @@ export default function AdminCategories() {
                     </div>
                   </div>
                   <div className="mt-3 flex gap-2">
-                    <button type="button" onClick={saveWorkForm} className="btn-primary">
-                      حفظ العمل
+                    <button
+                      type="button"
+                      onClick={() => void saveWorkForm()}
+                      disabled={savingWork}
+                      className="btn-primary disabled:opacity-60"
+                    >
+                      {savingWork ? 'جاري الحفظ...' : autoPublishOnSave ? 'حفظ ونشر' : 'حفظ العمل'}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setWorkForm(null)
                         setEditingWork(null)
+                        setWorkFormError('')
                       }}
                       className="btn-secondary"
                     >
@@ -429,19 +672,48 @@ export default function AdminCategories() {
               )}
 
               <ul className="space-y-2">
-                {works.map((p) => (
+                {filteredWorks.length > 0 && (
+                  <li className="flex items-center gap-2 rounded-xl border border-dashed border-gray-200 px-3 py-2 dark:border-gray-700">
+                    <input
+                      id="select-all-works"
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAllFiltered}
+                    />
+                    <label htmlFor="select-all-works" className="text-sm text-gray-600 dark:text-gray-400">
+                      تحديد الكل ({filteredWorks.length})
+                    </label>
+                  </li>
+                )}
+                {filteredWorks.map((p) => (
                   <li
                     key={p.id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-700"
                   >
-                    <div className="min-w-0">
-                      <span className="me-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded bg-primary-100 px-1 text-xs font-bold text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                        {p.displayNumber}
-                      </span>
-                      <span className="font-medium">{p.title.ar || p.title.en}</span>
-                      {p.published === false && (
-                        <span className="ms-2 text-xs text-amber-600">مخفي</span>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedWorkIds.has(p.id)}
+                        onChange={() => toggleWorkSelection(p.id)}
+                        aria-label={`تحديد ${p.title.ar || p.title.en}`}
+                      />
+                      {p.image && (
+                        <img
+                          src={p.image}
+                          alt=""
+                          className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                          loading="lazy"
+                        />
                       )}
+                      <div className="min-w-0">
+                        <span className="me-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded bg-primary-100 px-1 text-xs font-bold text-primary-800 dark:bg-primary-900 dark:text-primary-200">
+                          {p.displayNumber}
+                        </span>
+                        <span className="font-medium">{p.title.ar || p.title.en}</span>
+                        {p.published === false && (
+                          <span className="ms-2 text-xs text-amber-600">مخفي</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex shrink-0 gap-2">
                       <button type="button" className="text-sm text-primary-600" onClick={() => startEditWork(p)}>
@@ -459,6 +731,9 @@ export default function AdminCategories() {
                     </div>
                   </li>
                 ))}
+                {filteredWorks.length === 0 && works.length > 0 && (
+                  <p className="py-6 text-center text-sm text-gray-500">لا توجد نتائج للبحث</p>
+                )}
                 {works.length === 0 && (
                   <p className="py-6 text-center text-sm text-gray-500">لا توجد أعمال في هذا التصنيف</p>
                 )}
@@ -468,6 +743,20 @@ export default function AdminCategories() {
             <p className="py-8 text-center text-gray-500">أضف تصنيفاً أو اختر تصنيفاً من القائمة</p>
           )}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={autoPublishOnSave}
+            onChange={(e) => setAutoPublishOnSave(e.target.checked)}
+          />
+          نشر تلقائي على الموقع بعد حفظ الأعمال (موصى به)
+        </label>
+        {autoPublishMessage && (
+          <p className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">{autoPublishMessage}</p>
+        )}
       </div>
 
       <AdminSaveBar />

@@ -1,26 +1,12 @@
 /**
- * One-time migration after deploying the categories feature.
- * 1) Applies Prisma schema to the database (db push)
- * 2) Seeds default categories if missing
- * 3) Backfills Product.categoryId + displayNumber from legacy category keys
- *
- * Usage (production — use DIRECT_URL / non-pooled connection):
- *   npx prisma db push
- *   npm run db:migrate-categories
+ * Backfill Product.categoryId + displayNumber after db:apply-categories.
+ * Usage: npm run db:migrate-categories
  */
-import './loadEnv.js'
-import { execSync } from 'node:child_process'
-import { prisma } from './db'
-import { createDefaultCategories, LEGACY_CATEGORY_SLUG } from '../src/data/defaultCategories'
-import { categoryFromSiteData } from './mappers'
-
-async function ensureSchema() {
-  console.log('Applying Prisma schema (db push)...')
-  execSync('npx prisma db push --skip-generate', {
-    stdio: 'inherit',
-    env: process.env,
-  })
-}
+import '../server/loadEnv.js'
+import { prisma } from '../server/db'
+import { LEGACY_CATEGORY_SLUG } from '../src/data/defaultCategories'
+import { createDefaultCategories } from '../src/data/defaultCategories'
+import { categoryFromSiteData } from '../server/mappers'
 
 async function seedCategoriesIfEmpty() {
   const count = await prisma.portfolioCategory.count()
@@ -39,7 +25,7 @@ async function seedCategoriesIfEmpty() {
 async function backfillProductCategories() {
   const categories = await prisma.portfolioCategory.findMany({ orderBy: { sortOrder: 'asc' } })
   if (categories.length === 0) {
-    console.warn('No categories found — run seed first')
+    console.warn('No categories found — run: npm run db:apply-categories')
     return
   }
 
@@ -90,10 +76,9 @@ async function backfillProductCategories() {
 }
 
 async function main() {
-  await ensureSchema()
   await seedCategoriesIfEmpty()
   await backfillProductCategories()
-  console.log('Categories migration complete.')
+  console.log('Categories backfill complete.')
 }
 
 main()

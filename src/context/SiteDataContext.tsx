@@ -49,6 +49,7 @@ interface SiteDataContextType {
   updateContact: (contact: Partial<ContactSettings>) => void
   updateProducts: (products: Product[]) => void
   addProduct: (product: Product) => void
+  addProducts: (products: Product[]) => void
   updateProduct: (product: Product) => void
   deleteProduct: (id: string) => void
   updateCategories: (categories: PortfolioCategory[]) => void
@@ -62,7 +63,7 @@ interface SiteDataContextType {
   updateAdminPassword: (password: string) => void
   updateAdminEmail: (email: string) => void
   saveDraft: () => void
-  publish: () => Promise<{ ok: boolean; message: string }>
+  publish: (override?: SiteData) => Promise<{ ok: boolean; message: string }>
 }
 
 const SiteDataContext = createContext<SiteDataContextType | null>(null)
@@ -146,20 +147,43 @@ export function SiteDataProvider({
     const token = getAuthToken()
     const boot = resolveInitialSiteData(initialSiteData)
 
-    // Public visitors already have SSR bootstrap — skip redundant API round-trip.
+    const applyFresh = (data: SiteData) => {
+      if (cancelled) return
+      setSiteData((prev) => (shouldApplyIncomingSiteData(data, prev) ? data : prev))
+      saveSiteDataLocal(data)
+    }
+
+    const refreshFromApi = () => {
+      loadSiteData()
+        .then(applyFresh)
+        .catch(() => {
+          /* keep bootstrap */
+        })
+    }
+
+    // Public: show SSR bootstrap immediately, then refresh catalog in background (SWR).
     if (boot && !token) {
       setLoading(false)
+      const idle =
+        typeof window.requestIdleCallback === 'function'
+          ? window.requestIdleCallback(refreshFromApi, { timeout: 2500 })
+          : null
+      const timer = window.setTimeout(refreshFromApi, idle == null ? 1800 : 8000)
+      const onFocus = () => refreshFromApi()
+      window.addEventListener('focus', onFocus)
       return () => {
         cancelled = true
+        if (idle != null && typeof window.cancelIdleCallback === 'function') {
+          window.cancelIdleCallback(idle)
+        }
+        window.clearTimeout(timer)
+        window.removeEventListener('focus', onFocus)
       }
     }
 
     loadSiteData()
       .then((data) => {
-        if (!cancelled) {
-          setSiteData((prev) => (shouldApplyIncomingSiteData(data, prev) ? data : prev))
-          saveSiteDataLocal(data)
-        }
+        applyFresh(data)
       })
       .catch(() => {
         /* keep local/defaults */
@@ -287,6 +311,11 @@ export function SiteDataProvider({
     setSiteData((prev) => patchData(prev, { products: [...prev.products, product] }))
   }, [])
 
+  const addProducts = useCallback((items: Product[]) => {
+    if (items.length === 0) return
+    setSiteData((prev) => patchData(prev, { products: [...prev.products, ...items] }))
+  }, [])
+
   const updateProduct = useCallback((product: Product) => {
     setSiteData((prev) =>
       patchData(prev, {
@@ -366,17 +395,20 @@ export function SiteDataProvider({
     saveSiteDataLocal(siteData)
   }, [siteData])
 
-  const publish = useCallback(async () => {
-    let payload = siteData
+  const publish = useCallback(async (override?: SiteData) => {
+    let payload = override ?? siteData
     if (getAuthToken()) {
       const fresh = await loadSiteDataFresh()
-      payload = mergePublishPayload(siteData, fresh)
+      payload = mergePublishPayload(payload, fresh)
     }
     const result = await publishSiteData(payload)
     if (result.ok) {
       const fresh = await loadSiteDataFresh()
       setSiteData(fresh)
       saveSiteDataLocal(fresh)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('dorgham-catalog-published'))
+      }
     }
     return result
   }, [siteData])
@@ -396,6 +428,7 @@ export function SiteDataProvider({
         updateContact,
         updateProducts,
         addProduct,
+        addProducts,
         updateProduct,
         deleteProduct,
         updateCategories,

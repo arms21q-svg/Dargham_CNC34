@@ -195,7 +195,11 @@ function isProxySlideImage(url: string | undefined): boolean {
 /** Restore DB media when the admin UI still holds public proxy URLs from bootstrap. */
 export function mergePublishPayload(local: SiteData, stored: SiteData): SiteData {
   const storedById = new Map(stored.products.map((p) => [p.id, p]))
-  const products = local.products.map((p) => {
+  const localById = new Map<string, (typeof local.products)[number]>()
+  for (const p of local.products ?? []) {
+    localById.set(p.id, p)
+  }
+  const products = [...localById.values()].map((p) => {
     const db = storedById.get(p.id)
     if (!db) return p
 

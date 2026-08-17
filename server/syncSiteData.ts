@@ -13,6 +13,15 @@ type ProductRow = ReturnType<typeof productFromSiteData>
 type ManagerRow = ReturnType<typeof managerFromSiteData>
 type CategoryRow = ReturnType<typeof categoryFromSiteData>
 
+/** Last occurrence wins — prevents createMany unique(id) failures. */
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const map = new Map<string, T>()
+  for (const item of items) {
+    map.set(item.id, item)
+  }
+  return [...map.values()]
+}
+
 /** Never overwrite stored base64/URL with public proxy paths from a stripped client payload. */
 function preserveStoredMedia(incoming: string, stored: string): string {
   if (incoming && !isProxyMediaUrl(incoming)) return incoming
@@ -165,8 +174,11 @@ export async function syncSiteDataToDb(
   passwordHash: string
 ): Promise<SyncSiteDataResult> {
   const categories = (body.categories ?? []).map((c, i) => categoryFromSiteData(c, i))
-  const products = body.products.map((p, i) => productFromSiteData(p, i, body.categories ?? []))
-  const managers = body.managers.map((m, i) => managerFromSiteData(m, i))
+  const uniqueProducts = dedupeById(body.products)
+  const products = uniqueProducts.map((p, i) =>
+    productFromSiteData(p, i, body.categories ?? [])
+  )
+  const managers = dedupeById(body.managers).map((m, i) => managerFromSiteData(m, i))
 
   const [existingConfig, existingProducts, existingManagers, existingCategories] =
     await Promise.all([
@@ -317,13 +329,27 @@ export async function syncSiteDataToDb(
       }
 
       if (categoriesToCreate.length > 0) {
-        await tx.portfolioCategory.createMany({ data: categoriesToCreate })
+        await tx.portfolioCategory.createMany({
+          data: dedupeById(categoriesToCreate),
+          skipDuplicates: true,
+        })
       }
       if (productsToCreate.length > 0) {
-        await tx.product.createMany({ data: productsToCreate })
+        await Promise.all(
+          dedupeById(productsToCreate).map((p) =>
+            tx.product.upsert({
+              where: { id: p.id },
+              create: p,
+              update: p,
+            })
+          )
+        )
       }
       if (managersToCreate.length > 0) {
-        await tx.manager.createMany({ data: managersToCreate })
+        await tx.manager.createMany({
+          data: dedupeById(managersToCreate),
+          skipDuplicates: true,
+        })
       }
 
       if (categoriesToUpdate.length > 0) {

@@ -308,12 +308,25 @@ export function SiteDataProvider({
   }, [])
 
   const addProduct = useCallback((product: Product) => {
-    setSiteData((prev) => patchData(prev, { products: [...prev.products, product] }))
+    setSiteData((prev) => {
+      if (prev.products.some((p) => p.id === product.id)) {
+        return patchData(prev, {
+          products: prev.products.map((p) => (p.id === product.id ? product : p)),
+        })
+      }
+      return patchData(prev, { products: [...prev.products, product] })
+    })
   }, [])
 
   const addProducts = useCallback((items: Product[]) => {
     if (items.length === 0) return
-    setSiteData((prev) => patchData(prev, { products: [...prev.products, ...items] }))
+    setSiteData((prev) => {
+      const byId = new Map(prev.products.map((p) => [p.id, p]))
+      for (const item of items) {
+        byId.set(item.id, item)
+      }
+      return patchData(prev, { products: [...byId.values()] })
+    })
   }, [])
 
   const updateProduct = useCallback((product: Product) => {

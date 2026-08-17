@@ -20,6 +20,7 @@
     "db:migrate-categories": "tsx scripts/migrateCategories.ts",
     "db:setup-categories": "npm run db:apply-categories && npm run db:migrate-categories",
     "db:apply-attachments": "tsx scripts/applyAttachmentMigration.ts",
+    "db:setup-all": "npm run db:setup-categories && npm run db:apply-attachments",
     "db:seed": "tsx server/seed.ts",
     "admin:reset": "tsx scripts/resetAdminPassword.ts",
     "db:reindex": "tsx scripts/reindexImages.ts",

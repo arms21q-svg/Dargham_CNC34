@@ -15,23 +15,22 @@ export function isMissingAttachmentSchema(error: unknown): boolean {
   return /attachment(Data|Name|Mime|Size)/i.test(msg) && /does not exist/i.test(msg)
 }
 
-/** Cached probe — avoids repeated failures on every product query. */
+/** Cached probe — once true, skip re-checks for this instance. */
 export async function attachmentColumnsExist(): Promise<boolean> {
-  if (attachmentColumnsCached !== null) return attachmentColumnsCached
+  if (attachmentColumnsCached === true) return true
   try {
     await prisma.$queryRaw`SELECT "attachmentName" FROM "Product" LIMIT 1`
     attachmentColumnsCached = true
+    return true
   } catch (error) {
     if (isMissingAttachmentSchema(error)) {
       console.warn(
         '[schema] Product attachment columns missing — run: npm run db:apply-attachments'
       )
-      attachmentColumnsCached = false
-    } else {
-      throw error
+      return false
     }
+    throw error
   }
-  return attachmentColumnsCached
 }
 
 export function resetAttachmentSchemaCache(): void {

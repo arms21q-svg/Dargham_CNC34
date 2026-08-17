@@ -9,6 +9,7 @@ interface ImagePickerProps {
   label?: string
 }
 
+/** Admin image picker — upload from device only (no URL input). */
 export default function ImagePicker({ value, onChange, label = 'الصورة' }: ImagePickerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')

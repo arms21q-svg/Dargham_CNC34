@@ -76,7 +76,7 @@ function errorMessage(error: unknown): string {
     return 'تعذر الاتصال بقاعدة البيانات — تحقق من DATABASE_URL أو حالة Supabase'
   }
   if (code === 'P2028') {
-    return 'انتهت مهلة المعاملة مع قاعدة البيانات — أعد المحاولة'
+    return 'انتهت مهلة حفظ البيانات — انشر دفعات أصغر (20–30 عمل) أو استخدم صوراً أقل حجماً'
   }
   if (code === 'P2034') {
     return 'تعارض في قاعدة البيانات — أعد المحاولة'
@@ -145,19 +145,24 @@ export async function PUT(req: NextRequest) {
 
     const sync = await syncSiteDataToDb(body, passwordHash)
 
+    const inlineReindexLimit = 12
     if (sync.needsReindex.length > 0) {
-      try {
-        const indexResult = await ensureProductImageIndex({
-          forceIds: sync.needsReindex,
-          limit: 120,
-          deadline: Date.now() + 25_000,
-        })
-        console.info('[publish] image index', indexResult)
-      } catch (indexErr) {
-        console.warn('[publish] inline index failed — scheduling retry', indexErr)
+      if (sync.needsReindex.length <= inlineReindexLimit && sync.changedProducts <= 20) {
+        try {
+          const indexResult = await ensureProductImageIndex({
+            forceIds: sync.needsReindex,
+            limit: inlineReindexLimit,
+            deadline: Date.now() + 20_000,
+          })
+          console.info('[publish] image index', indexResult)
+        } catch (indexErr) {
+          console.warn('[publish] inline index failed — scheduling retry', indexErr)
+          scheduleProductImageReindex(sync.needsReindex)
+        }
+      } else {
         scheduleProductImageReindex(sync.needsReindex)
       }
-    } else {
+    } else if (sync.changedProducts <= 20) {
       void ensureProductImageIndex({ limit: 40, deadline: Date.now() + 15_000 }).catch(() => {})
     }
 

@@ -22,6 +22,32 @@ function dedupeById<T extends { id: string }>(items: T[]): T[] {
   return [...map.values()]
 }
 
+const WRITE_BATCH_SIZE = 15
+/** Supabase pooler + large base64 payloads need headroom under Vercel 60s limit. */
+const SYNC_TX_TIMEOUT_MS = 55_000
+const SYNC_TX_MAX_WAIT_MS = 15_000
+
+async function runInBatches<T>(
+  items: T[],
+  batchSize: number,
+  run: (item: T) => Promise<unknown>
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize)
+    await Promise.all(batch.map(run))
+  }
+}
+
+async function createManyInBatches<T extends Record<string, unknown>>(
+  items: T[],
+  batchSize: number,
+  create: (chunk: T[]) => Promise<unknown>
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    await create(items.slice(i, i + batchSize))
+  }
+}
+
 /** Never overwrite stored base64/URL with public proxy paths from a stripped client payload. */
 function preserveStoredMedia(incoming: string, stored: string): string {
   if (incoming && !isProxyMediaUrl(incoming)) return incoming
@@ -329,72 +355,52 @@ export async function syncSiteDataToDb(
       }
 
       if (categoriesToCreate.length > 0) {
-        await tx.portfolioCategory.createMany({
-          data: dedupeById(categoriesToCreate),
-          skipDuplicates: true,
-        })
+        await createManyInBatches(dedupeById(categoriesToCreate), WRITE_BATCH_SIZE, (chunk) =>
+          tx.portfolioCategory.createMany({ data: chunk, skipDuplicates: true })
+        )
       }
       if (productsToCreate.length > 0) {
-        await Promise.all(
-          dedupeById(productsToCreate).map((p) =>
-            tx.product.upsert({
-              where: { id: p.id },
-              create: p,
-              update: p,
-            })
-          )
+        await createManyInBatches(dedupeById(productsToCreate), WRITE_BATCH_SIZE, (chunk) =>
+          tx.product.createMany({ data: chunk, skipDuplicates: true })
         )
       }
       if (managersToCreate.length > 0) {
-        await tx.manager.createMany({
-          data: dedupeById(managersToCreate),
-          skipDuplicates: true,
-        })
+        await createManyInBatches(dedupeById(managersToCreate), WRITE_BATCH_SIZE, (chunk) =>
+          tx.manager.createMany({ data: chunk, skipDuplicates: true })
+        )
       }
 
       if (categoriesToUpdate.length > 0) {
-        await Promise.all(
-          categoriesToUpdate.map((c) =>
-            tx.portfolioCategory.update({
-              where: { id: c.id },
-              data: c,
-            })
-          )
+        await runInBatches(categoriesToUpdate, WRITE_BATCH_SIZE, (c) =>
+          tx.portfolioCategory.update({ where: { id: c.id }, data: c })
         )
       }
 
       if (productsToUpdate.length > 0) {
-        await Promise.all(
-          productsToUpdate.map((p) => {
-            const prev = prevProductById.get(p.id)!
-            const imageChanged = prev.image !== p.image
-            return tx.product.update({
-              where: { id: p.id },
-              data: imageChanged
-                ? {
-                    ...p,
-                    imageHash: null,
-                    imageVector: Prisma.DbNull,
-                    indexedAt: null,
-                  }
-                : p,
-            })
+        await runInBatches(productsToUpdate, WRITE_BATCH_SIZE, (p) => {
+          const prev = prevProductById.get(p.id)!
+          const imageChanged = prev.image !== p.image
+          return tx.product.update({
+            where: { id: p.id },
+            data: imageChanged
+              ? {
+                  ...p,
+                  imageHash: null,
+                  imageVector: Prisma.DbNull,
+                  indexedAt: null,
+                }
+              : p,
           })
-        )
+        })
       }
 
       if (managersToUpdate.length > 0) {
-        await Promise.all(
-          managersToUpdate.map((m) =>
-            tx.manager.update({
-              where: { id: m.id },
-              data: m,
-            })
-          )
+        await runInBatches(managersToUpdate, WRITE_BATCH_SIZE, (m) =>
+          tx.manager.update({ where: { id: m.id }, data: m })
         )
       }
     },
-    { timeout: 25_000, maxWait: 8_000 }
+    { timeout: SYNC_TX_TIMEOUT_MS, maxWait: SYNC_TX_MAX_WAIT_MS }
   )
 
   return {
